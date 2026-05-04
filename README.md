@@ -12,8 +12,9 @@ Built on top of GDExtension and Panama FFI to make Java a first-class citizen in
 > Status: 0.1.0 – production-ready with scoped memory management and full GDExtension feature coverage.
 
 Project examples:
-- [godot-java-examples](godot-java-examples/README.md)
-- [godot-java-3d-demo](https://github.com/youngledo/godot-java-3d-demo)
+- [godot-java-examples](godot-java-examples/README.md) — 10 small examples in this repo
+- [godot-java-demo-projects](https://github.com/youngledo/godot-java-demo-projects) — 107 official Godot demos ported to Java (2D, 3D, audio, GUI, networking, XR, and more)
+- [godot-java-3d-demo](https://github.com/youngledo/godot-java-3d-demo) — a 3D character demo
 
 ---
 

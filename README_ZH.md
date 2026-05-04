@@ -11,8 +11,9 @@
 > 状态：0.1.0——生产就绪，具备 scoped 内存管理和完整的 GDExtension 功能覆盖。
 
 项目示例：
-- [godot-java-examples](godot-java-examples/README_ZH.md)
-- [godot-java-3d-demo](https://github.com/youngledo/godot-java-3d-demo)
+- [godot-java-examples](godot-java-examples/README_ZH.md) — 本仓库内的 10 个小示例
+- [godot-java-demo-projects](https://github.com/youngledo/godot-java-demo-projects) — 107 个 Godot 官方示例的 Java 移植版（2D、3D、音频、GUI、网络、XR 等）
+- [godot-java-3d-demo](https://github.com/youngledo/godot-java-3d-demo) — 3D 角色演示
 
 ---
 

@@ -285,6 +285,16 @@ public abstract class Godot {
 		return false;
 	}
 
+	public void _draw() {
+	}
+
+	public void _integrateForces(java.lang.Object state) {
+	}
+
+	public boolean _guiInput(java.lang.Object event) {
+		return false;
+	}
+
 	public GodotArray _getConfigurationWarnings() {
 		return new GodotArray();
 	}

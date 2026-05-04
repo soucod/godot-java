@@ -369,9 +369,9 @@ public final class VariantUtils {
 			long ptr = objPtr.address();
 			if (ptr == 0)
 				return null;
-			Object obj = org.godot.internal.ref.JavaObjectMap.get(ptr);
-			if (obj instanceof Godot g)
-				return g;
+			Godot obj = org.godot.internal.ref.JavaObjectMap.get(ptr);
+			if (obj != null)
+				return obj;
 			// Query Godot class name and create typed wrapper
 			Godot typed = org.godot.internal.GodotClassRegistry.createTypedWrapper(ptr);
 			if (typed != null) {

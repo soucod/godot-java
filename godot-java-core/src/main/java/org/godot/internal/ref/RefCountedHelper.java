@@ -1,5 +1,7 @@
 package org.godot.internal.ref;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.godot.bridge.Bridge;
 import org.godot.core.GodotStringName;
 import org.godot.internal.api.ApiIndex;
@@ -29,6 +31,8 @@ import static java.lang.foreign.ValueLayout.*;
  * a non-RefCounted object via ptrcall would corrupt memory.
  */
 public final class RefCountedHelper {
+
+	private static final Logger logger = LogManager.getLogger(RefCountedHelper.class);
 
 	private RefCountedHelper() {
 	}
@@ -136,7 +140,8 @@ public final class RefCountedHelper {
 					retVar, errorVar);
 			Bridge.destroyVariant(retVar);
 		} catch (Exception e) {
-			// Object may already be freed
+			logger.debug("unreference failed for ptr 0x{}, object may already be freed: {}", Long.toHexString(ptr),
+					e.getMessage());
 		}
 	}
 

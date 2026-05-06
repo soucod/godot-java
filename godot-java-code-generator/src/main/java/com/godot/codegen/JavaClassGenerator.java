@@ -48,10 +48,48 @@ public class JavaClassGenerator {
 		addCreateFactory(classBuilder, classInfo);
 		addGetGodotClassName(classBuilder, classInfo);
 		addResolveMethodHash(classBuilder, classInfo);
+		addConvenienceMethods(classBuilder, classInfo);
 
 		JavaFile.Builder fileBuilder = JavaFile.builder(packageName, classBuilder.build()).skipJavaLangImports(true)
 				.indent("\t");
 		return fileBuilder;
+	}
+
+	/**
+	 * Add hand-written convenience methods to specific generated classes. These are
+	 * typed helper methods not derived from the Godot API but improve Java
+	 * ergonomics by providing typed access to common patterns.
+	 */
+	private void addConvenienceMethods(TypeSpec.Builder builder, ClassInfo classInfo) {
+		String name = classInfo.name();
+
+		if ("Node".equals(name)) {
+			ClassName nodeType = ClassName.get(packageName, "Node");
+			ClassName objectType = ClassName.get(packageName, "Object");
+
+			builder.addMethod(MethodSpec.methodBuilder("getNodeAs").addModifiers(Modifier.PUBLIC)
+					.addTypeVariable(TypeVariableName.get("T", objectType)).returns(TypeVariableName.get("T"))
+					.addParameter(String.class, "path")
+					.addParameter(ParameterizedTypeName.get(ClassName.get(Class.class), TypeVariableName.get("T")),
+							"type")
+					.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class).addMember("value", "$S", "unchecked")
+							.build())
+					.addStatement("$T node = getNode(path)", nodeType).addStatement("if (node == null) return null")
+					.addStatement("return ($T) node", TypeVariableName.get("T")).build());
+		}
+
+		if ("PackedScene".equals(name)) {
+			ClassName nodeType = ClassName.get(packageName, "Node");
+
+			builder.addMethod(MethodSpec.methodBuilder("instantiateAs").addModifiers(Modifier.PUBLIC)
+					.addTypeVariable(TypeVariableName.get("T", nodeType)).returns(TypeVariableName.get("T"))
+					.addParameter(ParameterizedTypeName.get(ClassName.get(Class.class), TypeVariableName.get("T")),
+							"type")
+					.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class).addMember("value", "$S", "unchecked")
+							.build())
+					.addStatement("$T node = instantiate()", nodeType).addStatement("if (node == null) return null")
+					.addStatement("return ($T) node", TypeVariableName.get("T")).build());
+		}
 	}
 
 	/**
@@ -190,6 +228,23 @@ public class JavaClassGenerator {
 		// Track generated method signatures to avoid duplicates
 		Set<String> generatedSignatures = new java.util.HashSet<>();
 
+		// Build set of property Java accessor names (getXxx, setXxx, isXxx)
+		// to avoid generating duplicate methods when a Godot method name
+		// converts to the same Java name as a property accessor.
+		Set<String> propertyJavaAccessorNames = new java.util.HashSet<>();
+
+		for (PropertyInfo prop : classInfo.properties()) {
+			String javaPropName = toJavaPropertyName(prop.name());
+			String capitalized = Character.toUpperCase(javaPropName.charAt(0)) + javaPropName.substring(1);
+			if (prop.getter() != null && !prop.getter().isEmpty()) {
+				propertyJavaAccessorNames.add("get" + capitalized);
+				propertyJavaAccessorNames.add("is" + capitalized);
+			}
+			if (prop.setter() != null && !prop.setter().isEmpty()) {
+				propertyJavaAccessorNames.add("set" + capitalized);
+			}
+		}
+
 		for (MethodInfo method : classInfo.methods()) {
 			// Skip virtual methods (prefixed with _)
 			if (method.name().startsWith("_") || method.isVirtual()) {
@@ -204,17 +259,13 @@ public class JavaClassGenerator {
 				continue;
 			}
 
-			// Skip setter methods (handled by properties)
-			if (method.name().startsWith("set_") && method.arguments().size() == 1) {
-				continue;
-			}
-
-			// Skip getter methods (handled by properties)
-			if (method.name().startsWith("get_") && method.arguments().isEmpty()) {
-				continue;
-			}
-
 			String javaMethodName = toJavaMethodName(method.name());
+
+			// Skip methods whose Java name collides with a property accessor
+			if (propertyJavaAccessorNames.contains(javaMethodName)) {
+				continue;
+			}
+
 			String returnType = getReturnType(method);
 
 			// Build parameter list
@@ -250,25 +301,250 @@ public class JavaClassGenerator {
 				callArgs = ", new java.lang.Object[] { " + args + " }";
 			}
 
-			MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(javaMethodName).addModifiers(Modifier.PUBLIC)
-					.addParameters(params);
+			MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(javaMethodName).addParameters(params);
 
-			if (!returnType.equals("void")) {
-				methodBuilder.returns(toTypeName(returnType));
-				methodBuilder.addStatement("return ($T) super.call($S$L)", toTypeName(returnType), method.name(),
-						callArgs);
+			if (method.isStatic()) {
+				// Static method: use callStatic with class name and hash
+				methodBuilder.addModifiers(Modifier.PUBLIC, Modifier.STATIC);
+				if (!returnType.equals("void")) {
+					methodBuilder.returns(toTypeName(returnType));
+					methodBuilder.addStatement("return ($T) callStatic($S, $S, $L$L)", toTypeName(returnType),
+							classInfo.name(), method.name(), method.hash() + "L", callArgs);
+				} else {
+					methodBuilder.addStatement("callStatic($S, $S, $L$L)", classInfo.name(), method.name(),
+							method.hash() + "L", callArgs);
+				}
 			} else {
-				methodBuilder.addStatement("super.call($S$L)", method.name(), callArgs);
+				methodBuilder.addModifiers(Modifier.PUBLIC);
+				if (!returnType.equals("void")) {
+					methodBuilder.returns(toTypeName(returnType));
+					methodBuilder.addStatement("return ($T) super.call($S$L)", toTypeName(returnType), method.name(),
+							callArgs);
+				} else {
+					methodBuilder.addStatement("super.call($S$L)", method.name(), callArgs);
+				}
 			}
 
 			builder.addMethod(methodBuilder.build());
+
+			// Generate overloads for trailing default-value parameters
+			generateDefaultOverloads(builder, classInfo, method, javaMethodName, returnType, params, paramNames,
+					paramTypes, generatedSignatures);
 		}
+	}
+
+	/**
+	 * Generate convenience overloads by progressively omitting trailing parameters
+	 * that have default values.
+	 */
+	private void generateDefaultOverloads(TypeSpec.Builder builder, ClassInfo classInfo, MethodInfo method,
+			String javaMethodName, String returnType, List<ParameterSpec> fullParams, List<String> paramNames,
+			List<String> paramTypes, Set<String> generatedSignatures) {
+		List<ArgInfo> args = method.arguments();
+		if (args.isEmpty()) {
+			return;
+		}
+
+		// Find the first trailing argument with a default value
+		int firstDefaultIdx = -1;
+		for (int i = args.size() - 1; i >= 0; i--) {
+			if (args.get(i).defaultValue() != null) {
+				firstDefaultIdx = i;
+			} else {
+				break;
+			}
+		}
+		if (firstDefaultIdx < 0) {
+			return;
+		}
+
+		// Generate overloads from removing 1, 2, ... trailing defaults
+		for (int cutAt = args.size() - 1; cutAt >= firstDefaultIdx; cutAt--) {
+			int overloadArgCount = cutAt;
+
+			// Skip this overload if any omitted default value can't be expressed in Java
+			// (e.g., null for primitive types like long, or 0 for Godot class types)
+			boolean skipOverload = false;
+			for (int i = overloadArgCount; i < args.size(); i++) {
+				String defVal = defaultValueToJava(args.get(i), paramTypes.get(i));
+				String paramType = paramTypes.get(i);
+				if ("null".equals(defVal) && isPrimitiveType(paramType)) {
+					skipOverload = true;
+					break;
+				}
+				if ("null".equals(defVal) && !isPrimitiveType(paramType) && !"String".equals(paramType)) {
+					// null is fine for reference types (except String which maps to java String)
+				}
+				if (!"null".equals(defVal) && !isPrimitiveType(paramType) && !"String".equals(paramType)
+						&& !"double".equals(paramType) && !"float".equals(paramType)) {
+					// Numeric default for a Godot class type — can't convert
+					if (defVal.matches("-?\\d+L?") || defVal.matches("-?\\d+\\.\\d*f?")) {
+						skipOverload = true;
+						break;
+					}
+				}
+			}
+			if (skipOverload) {
+				continue;
+			}
+
+			List<ParameterSpec> overloadParams = new ArrayList<>();
+			List<String> overloadTypes = new ArrayList<>();
+			for (int i = 0; i < overloadArgCount; i++) {
+				overloadParams.add(fullParams.get(i));
+				overloadTypes.add(paramTypes.get(i));
+			}
+
+			String overloadSig = javaMethodName + "(" + String.join(",", overloadTypes) + ")";
+			if (!generatedSignatures.add(overloadSig)) {
+				continue;
+			}
+
+			StringBuilder delegateArgs = new StringBuilder();
+			for (int i = 0; i < overloadArgCount; i++) {
+				if (delegateArgs.length() > 0)
+					delegateArgs.append(", ");
+				delegateArgs.append(paramNames.get(i));
+			}
+			for (int i = overloadArgCount; i < args.size(); i++) {
+				if (delegateArgs.length() > 0)
+					delegateArgs.append(", ");
+				delegateArgs.append(defaultValueToJava(args.get(i), paramTypes.get(i)));
+			}
+
+			MethodSpec.Builder overloadBuilder = MethodSpec.methodBuilder(javaMethodName).addParameters(overloadParams);
+			if (method.isStatic()) {
+				overloadBuilder.addModifiers(Modifier.PUBLIC, Modifier.STATIC);
+			} else {
+				overloadBuilder.addModifiers(Modifier.PUBLIC);
+			}
+
+			String delegateCall = javaMethodName + "(" + delegateArgs + ")";
+			if (!returnType.equals("void")) {
+				overloadBuilder.returns(toTypeName(returnType));
+				overloadBuilder.addStatement("return " + delegateCall);
+			} else {
+				overloadBuilder.addStatement(delegateCall);
+			}
+
+			builder.addMethod(overloadBuilder.build());
+		}
+	}
+
+	private boolean isPrimitiveType(String javaType) {
+		return switch (javaType) {
+			case "boolean", "byte", "short", "int", "long", "float", "double", "char" -> true;
+			default -> false;
+		};
+	}
+
+	private String defaultValueToJava(ArgInfo arg, String javaType) {
+		String dv = arg.defaultValue();
+		if (dv == null) {
+			return "null";
+		}
+		switch (dv) {
+			case "false" :
+				return "false";
+			case "true" :
+				return "true";
+			case "null" :
+				return "null";
+			default :
+				break;
+		}
+		if (dv.matches("-?\\d+")) {
+			switch (javaType) {
+				case "long" :
+					return dv + "L";
+				case "int" :
+					return dv;
+				case "short" :
+					return "(short)" + dv;
+				case "byte" :
+					return "(byte)" + dv;
+				default :
+					return dv;
+			}
+		}
+		if (dv.matches("-?\\d+\\.\\d*")) {
+			switch (javaType) {
+				case "double" :
+					return dv;
+				case "float" :
+					return dv + "f";
+				default :
+					return dv;
+			}
+		}
+		if (dv.startsWith("\"") && dv.endsWith("\"")) {
+			return dv;
+		}
+		if (dv.endsWith("()")) {
+			switch (javaType) {
+				case "byte[]" :
+					return "new byte[0]";
+				case "int[]" :
+					return "new int[0]";
+				case "long[]" :
+					return "new long[0]";
+				case "double[]" :
+					return "new double[0]";
+				case "String[]" :
+					return "new String[0]";
+				case "double[][]" :
+					return "new double[0][]";
+				default :
+					return "null";
+			}
+		}
+		return "null";
+	}
+
+	/**
+	 * Build a map of all accessor Java names to their Java return types by walking
+	 * up the inheritance chain. Includes both property accessors and regular
+	 * methods to detect parent/child conflicts.
+	 */
+	private Map<String, String> buildParentAccessorTypes(ClassInfo classInfo) {
+		Map<String, String> result = new HashMap<>();
+		String parentName = classInfo.inherits();
+		while (parentName != null && !parentName.isEmpty()) {
+			ClassInfo parent = classMap.get(parentName);
+			if (parent == null)
+				break;
+			// Collect property accessor types
+			for (PropertyInfo prop : parent.properties()) {
+				String propJavaName = toJavaPropertyName(prop.name());
+				String propJavaType = toSingleJavaType(prop.type());
+				String capitalized = capitalize(propJavaName);
+				String getterMethod = prop.getter();
+				if (getterMethod != null && getterMethod.startsWith("is_")) {
+					result.putIfAbsent("is" + capitalized, propJavaType);
+				} else {
+					result.putIfAbsent("get" + capitalized, propJavaType);
+				}
+				result.putIfAbsent("set" + capitalized, propJavaType);
+			}
+			// Collect method return types (to detect method-property conflicts)
+			for (MethodInfo m : parent.methods()) {
+				String javaName = toJavaMethodName(m.name());
+				String javaRetType = getReturnType(m);
+				if (javaRetType != null && !javaRetType.equals("void")) {
+					result.putIfAbsent(javaName, javaRetType);
+				}
+			}
+			parentName = parent.inherits();
+		}
+		return result;
 	}
 
 	/**
 	 * Add property getter/setter methods.
 	 */
 	private void addProperties(TypeSpec.Builder builder, ClassInfo classInfo) {
+		Map<String, String> parentAccessorTypes = buildParentAccessorTypes(classInfo);
+
 		for (PropertyInfo prop : classInfo.properties()) {
 			String javaPropName = toJavaPropertyName(prop.name());
 			String javaType = toSingleJavaType(prop.type());
@@ -285,6 +561,12 @@ public class JavaClassGenerator {
 			String getterName = "get" + capitalize(javaPropName);
 			if (getterMethod.startsWith("is_")) {
 				getterName = "is" + capitalize(javaPropName);
+			}
+
+			// Skip if parent has same accessor name with different type
+			String parentGetterType = parentAccessorTypes.get(getterName);
+			if (parentGetterType != null && !parentGetterType.equals(javaType)) {
+				continue;
 			}
 
 			MethodSpec getterSpec = MethodSpec.methodBuilder(getterName).addModifiers(Modifier.PUBLIC)
@@ -403,31 +685,29 @@ public class JavaClassGenerator {
 	private String toJavaMethodName(String godotName) {
 		// Methods from java.lang.Object that cannot be overridden
 		if (godotName.equals("wait") || godotName.equals("notify") || godotName.equals("notifyAll")
-				|| godotName.equals("equals") || godotName.equals("hashCode") || godotName.equals("toString")) {
+				|| godotName.equals("equals") || godotName.equals("hashCode") || godotName.equals("toString")
+				|| godotName.equals("get_class")) {
 			return godotName + "_";
 		}
 
-		if (Character.isLowerCase(godotName.charAt(0))) {
-			if (JAVA_KEYWORDS.contains(godotName)) {
-				return godotName + "_";
+		// Convert snake_case to camelCase for Java convention
+		String name = godotName;
+		if (godotName.contains("_")) {
+			StringBuilder result = new StringBuilder();
+			boolean nextUpper = false;
+			for (char c : godotName.toCharArray()) {
+				if (c == '_') {
+					nextUpper = true;
+				} else if (nextUpper) {
+					result.append(Character.toUpperCase(c));
+					nextUpper = false;
+				} else {
+					result.append(c);
+				}
 			}
-			return godotName;
+			name = result.toString();
 		}
 
-		// Convert snake_case to camelCase
-		StringBuilder result = new StringBuilder();
-		boolean nextUpper = false;
-		for (char c : godotName.toCharArray()) {
-			if (c == '_') {
-				nextUpper = true;
-			} else if (nextUpper) {
-				result.append(Character.toUpperCase(c));
-				nextUpper = false;
-			} else {
-				result.append(c);
-			}
-		}
-		String name = result.toString();
 		if (JAVA_KEYWORDS.contains(name)) {
 			return name + "_";
 		}

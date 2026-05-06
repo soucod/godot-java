@@ -56,11 +56,15 @@ public record ClassInfo(String name, String inherits, boolean isRefcounted, bool
  *            constructor declarations
  */
 record BuiltinClassInfo(String name, List<ExtensionApiParser.Operator> operators,
-		List<ExtensionApiParser.Constructor> constructors) {
+		List<ExtensionApiParser.Constructor> constructors, List<BuiltinMethodInfo> methods) {
 
 	public boolean isBuiltin() {
 		return true;
 	}
+}
+
+record BuiltinMethodInfo(String name, String returnType, boolean isConst, boolean isStatic, boolean isVararg, long hash,
+		List<ArgInfo> arguments) {
 }
 
 /**
@@ -123,7 +127,7 @@ record MethodInfo(String name, boolean isConst, boolean isStatic, boolean isVirt
  * @param meta
  *            type meta (e.g. "int32"), or null
  */
-record ArgInfo(String name, String type, String meta) {
+record ArgInfo(String name, String type, String meta, String defaultValue) {
 }
 
 /**

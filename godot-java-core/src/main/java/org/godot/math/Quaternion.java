@@ -1,5 +1,8 @@
 package org.godot.math;
 
+import java.lang.foreign.MemorySegment;
+import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
+
 /**
  * Quaternion for 3D rotation (w + xi + yj + zk).
  *
@@ -228,5 +231,17 @@ public final class Quaternion {
 	@Override
 	public String toString() {
 		return "Quaternion(" + x + ", " + y + ", " + z + ", " + w + ")";
+	}
+
+	public void toSegment(MemorySegment seg) {
+		seg.set(JAVA_DOUBLE, 0, x);
+		seg.set(JAVA_DOUBLE, 8, y);
+		seg.set(JAVA_DOUBLE, 16, z);
+		seg.set(JAVA_DOUBLE, 24, w);
+	}
+
+	public static Quaternion fromSegment(MemorySegment seg) {
+		return new Quaternion(seg.get(JAVA_DOUBLE, 0), seg.get(JAVA_DOUBLE, 8), seg.get(JAVA_DOUBLE, 16),
+				seg.get(JAVA_DOUBLE, 24));
 	}
 }

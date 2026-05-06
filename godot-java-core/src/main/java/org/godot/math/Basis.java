@@ -1,5 +1,8 @@
 package org.godot.math;
 
+import java.lang.foreign.MemorySegment;
+import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
+
 /**
  * 3x3 basis matrix for 3D rotation and scale.
  *
@@ -276,5 +279,23 @@ public final class Basis {
 	public String toString() {
 		return "Basis[\n  (" + xx + "," + xy + "," + xz + "),\n  (" + yx + "," + yy + "," + yz + "),\n  (" + zx + ","
 				+ zy + "," + zz + ")]";
+	}
+
+	public void toSegment(MemorySegment seg) {
+		seg.set(JAVA_DOUBLE, 0, xx);
+		seg.set(JAVA_DOUBLE, 8, xy);
+		seg.set(JAVA_DOUBLE, 16, xz);
+		seg.set(JAVA_DOUBLE, 24, yx);
+		seg.set(JAVA_DOUBLE, 32, yy);
+		seg.set(JAVA_DOUBLE, 40, yz);
+		seg.set(JAVA_DOUBLE, 48, zx);
+		seg.set(JAVA_DOUBLE, 56, zy);
+		seg.set(JAVA_DOUBLE, 64, zz);
+	}
+
+	public static Basis fromSegment(MemorySegment seg) {
+		return new Basis(seg.get(JAVA_DOUBLE, 0), seg.get(JAVA_DOUBLE, 8), seg.get(JAVA_DOUBLE, 16),
+				seg.get(JAVA_DOUBLE, 24), seg.get(JAVA_DOUBLE, 32), seg.get(JAVA_DOUBLE, 40), seg.get(JAVA_DOUBLE, 48),
+				seg.get(JAVA_DOUBLE, 56), seg.get(JAVA_DOUBLE, 64));
 	}
 }

@@ -1,5 +1,8 @@
 package org.godot.math;
 
+import java.lang.foreign.MemorySegment;
+import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
+
 /**
  * Axis-Aligned Bounding Box (AABB) in 3D space.
  *
@@ -207,5 +210,19 @@ public final class AABB {
 	@Override
 	public String toString() {
 		return "AABB(pos=(" + x + "," + y + "," + z + "), size=(" + sizeX + "," + sizeY + "," + sizeZ + "))";
+	}
+
+	public void toSegment(MemorySegment seg) {
+		seg.set(JAVA_DOUBLE, 0, x);
+		seg.set(JAVA_DOUBLE, 8, y);
+		seg.set(JAVA_DOUBLE, 16, z);
+		seg.set(JAVA_DOUBLE, 24, sizeX);
+		seg.set(JAVA_DOUBLE, 32, sizeY);
+		seg.set(JAVA_DOUBLE, 40, sizeZ);
+	}
+
+	public static AABB fromSegment(MemorySegment seg) {
+		return new AABB(seg.get(JAVA_DOUBLE, 0), seg.get(JAVA_DOUBLE, 8), seg.get(JAVA_DOUBLE, 16),
+				seg.get(JAVA_DOUBLE, 24), seg.get(JAVA_DOUBLE, 32), seg.get(JAVA_DOUBLE, 40));
 	}
 }

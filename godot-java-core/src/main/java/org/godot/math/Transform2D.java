@@ -1,5 +1,8 @@
 package org.godot.math;
 
+import java.lang.foreign.MemorySegment;
+import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
+
 /**
  * 2D transform (3x2 matrix: basis + origin).
  *
@@ -199,5 +202,20 @@ public final class Transform2D {
 	@Override
 	public String toString() {
 		return "Transform2D[\n  " + x + ", " + y + ", " + origin + "]";
+	}
+
+	public void toSegment(MemorySegment seg) {
+		seg.set(JAVA_DOUBLE, 0, x.x);
+		seg.set(JAVA_DOUBLE, 8, x.y);
+		seg.set(JAVA_DOUBLE, 16, y.x);
+		seg.set(JAVA_DOUBLE, 24, y.y);
+		seg.set(JAVA_DOUBLE, 32, origin.x);
+		seg.set(JAVA_DOUBLE, 40, origin.y);
+	}
+
+	public static Transform2D fromSegment(MemorySegment seg) {
+		return new Transform2D(new Vector2(seg.get(JAVA_DOUBLE, 0), seg.get(JAVA_DOUBLE, 8)),
+				new Vector2(seg.get(JAVA_DOUBLE, 16), seg.get(JAVA_DOUBLE, 24)),
+				new Vector2(seg.get(JAVA_DOUBLE, 32), seg.get(JAVA_DOUBLE, 40)));
 	}
 }

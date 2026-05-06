@@ -622,6 +622,19 @@ public final class Bridge {
 	}
 
 	/**
+	 * Call an API function that returns a pointer, with int + MemorySegment + long
+	 * args. Used for variant_get_ptr_builtin_method(type, method, hash).
+	 */
+	public static MemorySegment callPtr(ApiIndex api, int arg1, MemorySegment arg2, long arg3) {
+		ThreadChecker.ensureMainThread();
+		try {
+			return (MemorySegment) requireApi(api).invoke(arg1, arg2, arg3);
+		} catch (Throwable t) {
+			throw new org.godot.exception.GodotApiException(api.name(), "callPtr(int,MS,long)", t);
+		}
+	}
+
+	/**
 	 * Call an API function that returns a pointer, with 2 MemorySegment arguments.
 	 * Used for array_operator_index_const, etc.
 	 */

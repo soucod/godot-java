@@ -75,52 +75,52 @@ public class SnakeGame extends Node2D {
 		double offsetX = (1152 - GRID_W * CELL_SIZE) / 2.0;
 		double offsetY = (648 - GRID_H * CELL_SIZE) / 2.0;
 		container = Node2D.create();
-		container.call("set_position", new Vector2(offsetX, offsetY));
-		add_child(container, false, 0);
+		container.setPosition(new Vector2(offsetX, offsetY));
+		addChild(container, false, 0);
 
 		// Grid background
 		ColorRect bg = ColorRect.create();
-		bg.call("set_color", BG_COLOR);
-		bg.call("set_size", new Vector2(GRID_W * CELL_SIZE, GRID_H * CELL_SIZE));
-		container.add_child(bg, false, 0);
+		bg.setColor(BG_COLOR);
+		bg.setSize(new Vector2(GRID_W * CELL_SIZE, GRID_H * CELL_SIZE));
+		container.addChild(bg, false, 0);
 
 		// Grid lines (horizontal)
 		for (int y = 0; y <= GRID_H; y++) {
 			ColorRect line = ColorRect.create();
-			line.call("set_color", GRID_LINE_COLOR);
-			line.call("set_size", new Vector2(GRID_W * CELL_SIZE, 1));
-			line.call("set_position", new Vector2(0, y * CELL_SIZE));
-			container.add_child(line, false, 0);
+			line.setColor(GRID_LINE_COLOR);
+			line.setSize(new Vector2(GRID_W * CELL_SIZE, 1));
+			line.setPosition(new Vector2(0, y * CELL_SIZE));
+			container.addChild(line, false, 0);
 		}
 		// Grid lines (vertical)
 		for (int x = 0; x <= GRID_W; x++) {
 			ColorRect line = ColorRect.create();
-			line.call("set_color", GRID_LINE_COLOR);
-			line.call("set_size", new Vector2(1, GRID_H * CELL_SIZE));
-			line.call("set_position", new Vector2(x * CELL_SIZE, 0));
-			container.add_child(line, false, 0);
+			line.setColor(GRID_LINE_COLOR);
+			line.setSize(new Vector2(1, GRID_H * CELL_SIZE));
+			line.setPosition(new Vector2(x * CELL_SIZE, 0));
+			container.addChild(line, false, 0);
 		}
 
 		// Food rect
 		foodRect = ColorRect.create();
-		foodRect.call("set_color", FOOD_COLOR);
-		foodRect.call("set_size", new Vector2(CELL_SIZE - 2, CELL_SIZE - 2));
-		container.add_child(foodRect, false, 0);
+		foodRect.setColor(FOOD_COLOR);
+		foodRect.setSize(new Vector2(CELL_SIZE - 2, CELL_SIZE - 2));
+		container.addChild(foodRect, false, 0);
 
 		// Score label
 		scoreLabel = Label.create();
-		scoreLabel.call("add_theme_font_size_override", "font_size", 24);
-		scoreLabel.call("set_position", new Vector2(10, 10));
-		add_child(scoreLabel, false, 0);
+		scoreLabel.addThemeFontSizeOverride("font_size", 24);
+		scoreLabel.setPosition(new Vector2(10, 10));
+		addChild(scoreLabel, false, 0);
 
 		// Message label
 		messageLabel = Label.create();
-		messageLabel.call("set_horizontal_alignment", 1);
-		messageLabel.call("add_theme_font_size_override", "font_size", 28);
-		messageLabel.call("set_position", new Vector2(1152 / 2 - 200, 648 / 2 - 20));
-		messageLabel.call("set_size", new Vector2(400, 40));
-		messageLabel.call("set_visible", false);
-		add_child(messageLabel, false, 0);
+		messageLabel.setHorizontalAlignment(1);
+		messageLabel.addThemeFontSizeOverride("font_size", 28);
+		messageLabel.setPosition(new Vector2(1152 / 2 - 200, 648 / 2 - 20));
+		messageLabel.setSize(new Vector2(400, 40));
+		messageLabel.setVisible(false);
+		addChild(messageLabel, false, 0);
 
 		restart();
 		updateScoreDisplay();
@@ -131,19 +131,19 @@ public class SnakeGame extends Node2D {
 	public void _process(double delta) {
 		Input input = Input.singleton();
 
-		if (input.is_action_just_pressed("move_up", false)) {
+		if (input.isActionJustPressed("move_up", false)) {
 			setDirection(UP);
-		} else if (input.is_action_just_pressed("move_right", false)) {
+		} else if (input.isActionJustPressed("move_right", false)) {
 			setDirection(RIGHT);
-		} else if (input.is_action_just_pressed("move_down", false)) {
+		} else if (input.isActionJustPressed("move_down", false)) {
 			setDirection(DOWN);
-		} else if (input.is_action_just_pressed("move_left", false)) {
+		} else if (input.isActionJustPressed("move_left", false)) {
 			setDirection(LEFT);
 		}
 
-		if (gameOver && input.is_action_just_pressed("ui_accept", false)) {
+		if (gameOver && input.isActionJustPressed("ui_accept", false)) {
 			restart();
-			messageLabel.call("set_visible", false);
+			messageLabel.setVisible(false);
 			updateScoreDisplay();
 		}
 
@@ -183,7 +183,7 @@ public class SnakeGame extends Node2D {
 		if (newX == foodX && newY == foodY) {
 			score++;
 			growing = true;
-			call("emit_signal", "onScoreChanged", score);
+			emitSignal("onScoreChanged", score);
 			spawnFood();
 			updateScoreDisplay();
 		}
@@ -201,13 +201,13 @@ public class SnakeGame extends Node2D {
 		// Sync segment rects to match segments list
 		while (segmentRects.size() < segments.size()) {
 			ColorRect rect = ColorRect.create();
-			rect.call("set_size", new Vector2(CELL_SIZE - 2, CELL_SIZE - 2));
-			container.add_child(rect, false, 0);
+			rect.setSize(new Vector2(CELL_SIZE - 2, CELL_SIZE - 2));
+			container.addChild(rect, false, 0);
 			segmentRects.add(rect);
 		}
 		while (segmentRects.size() > segments.size()) {
 			ColorRect removed = segmentRects.remove(segmentRects.size() - 1);
-			container.call("remove_child", removed);
+			container.removeChild(removed);
 		}
 
 		// Update positions and colors
@@ -215,29 +215,29 @@ public class SnakeGame extends Node2D {
 			int sx = segments.get(i)[0];
 			int sy = segments.get(i)[1];
 			ColorRect rect = segmentRects.get(i);
-			rect.call("set_position", new Vector2(sx * CELL_SIZE + 1, sy * CELL_SIZE + 1));
+			rect.setPosition(new Vector2(sx * CELL_SIZE + 1, sy * CELL_SIZE + 1));
 			if (i == 0) {
 				// Head: brighter, full size
-				rect.call("set_color", HEAD_COLOR);
-				rect.call("set_size", new Vector2(CELL_SIZE, CELL_SIZE));
-				rect.call("set_position", new Vector2(sx * CELL_SIZE, sy * CELL_SIZE));
+				rect.setColor(HEAD_COLOR);
+				rect.setSize(new Vector2(CELL_SIZE, CELL_SIZE));
+				rect.setPosition(new Vector2(sx * CELL_SIZE, sy * CELL_SIZE));
 			} else {
 				float t = (float) i / segments.size();
 				double g = 0.8 - t * 0.4;
-				rect.call("set_color", new Color(0.1, g, 0.2));
-				rect.call("set_size", new Vector2(CELL_SIZE - 2, CELL_SIZE - 2));
+				rect.setColor(new Color(0.1, g, 0.2));
+				rect.setSize(new Vector2(CELL_SIZE - 2, CELL_SIZE - 2));
 			}
 		}
 
 		// Update food position
-		foodRect.call("set_position", new Vector2(foodX * CELL_SIZE + 1, foodY * CELL_SIZE + 1));
+		foodRect.setPosition(new Vector2(foodX * CELL_SIZE + 1, foodY * CELL_SIZE + 1));
 	}
 
 	private void endGame() {
 		gameOver = true;
-		call("emit_signal", "onGameOver", score);
-		messageLabel.call("set_text", "Game Over! Score: " + score + "  [Space to restart]");
-		messageLabel.call("set_visible", true);
+		emitSignal("onGameOver", score);
+		messageLabel.setText("Game Over! Score: " + score + "  [Space to restart]");
+		messageLabel.setVisible(true);
 		logger.info("Game Over! Final score: {}", score);
 	}
 
@@ -263,7 +263,7 @@ public class SnakeGame extends Node2D {
 	}
 
 	private void updateScoreDisplay() {
-		scoreLabel.call("set_text", "Score: " + score);
+		scoreLabel.setText("Score: " + score);
 	}
 
 	@Signal

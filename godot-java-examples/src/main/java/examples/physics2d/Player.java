@@ -5,22 +5,17 @@ import org.apache.logging.log4j.Logger;
 import org.godot.annotation.Export;
 import org.godot.annotation.GodotClass;
 import org.godot.math.Vector2;
-import org.godot.node.Node2D;
+import org.godot.node.CharacterBody2D;
 import org.godot.singleton.Input;
 
 /**
  * Example 07: Physics 2D
  *
- * Demonstrates physics movement with a CharacterBody2D parent. Since generated
- * classes like CharacterBody2D don't expose public no-arg constructors, we
- * extend Node2D and use call() to invoke physics methods on the Godot-side
- * CharacterBody2D.
- *
- * The @GodotClass parent="CharacterBody2D" makes Godot create this as a
- * CharacterBody2D subclass, so all physics methods are available.
+ * Demonstrates physics movement with CharacterBody2D. Uses typed methods
+ * (moveAndSlide, getVelocity, setVelocity, isOnFloor) directly.
  */
 @GodotClass(name = "Player", parent = "CharacterBody2D")
-public class Player extends Node2D {
+public class Player extends CharacterBody2D {
 
 	private static final Logger logger = LogManager.getLogger(Player.class);
 
@@ -42,18 +37,17 @@ public class Player extends Node2D {
 		Input input = Input.singleton();
 
 		// Read input direction
-		double direction = input.get_axis("move_left", "move_right");
+		double direction = input.getAxis("move_left", "move_right");
 
 		// Jump
-		if (input.is_action_just_pressed("jump", false)) {
-			boolean onFloor = (boolean) call("is_on_floor");
-			if (onFloor) {
-				Vector2 vel = (Vector2) call("get_velocity");
-				call("set_velocity", new Vector2(vel.x, jumpVelocity));
+		if (input.isActionJustPressed("jump", false)) {
+			if (isOnFloor()) {
+				Vector2 vel = getVelocity();
+				setVelocity(new Vector2(vel.x, jumpVelocity));
 			}
 		}
 
-		Vector2 vel = (Vector2) call("get_velocity");
+		Vector2 vel = getVelocity();
 
 		// Apply gravity
 		double vy = vel.y + gravity * delta;
@@ -61,7 +55,7 @@ public class Player extends Node2D {
 		// Apply horizontal movement from input
 		double vx = direction * speed;
 
-		call("set_velocity", new Vector2(vx, vy));
-		call("move_and_slide");
+		setVelocity(new Vector2(vx, vy));
+		moveAndSlide();
 	}
 }

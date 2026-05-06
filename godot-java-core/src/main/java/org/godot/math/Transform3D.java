@@ -1,5 +1,8 @@
 package org.godot.math;
 
+import java.lang.foreign.MemorySegment;
+import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
+
 /**
  * 3D transform (4x4 homogeneous matrix: 3x3 basis + origin).
  *
@@ -238,5 +241,37 @@ public final class Transform3D {
 	public String toString() {
 		return "Transform3D[\n  basis=(" + xx + "," + xy + "," + xz + ";" + yx + "," + yy + "," + yz + ";" + zx + ","
 				+ zy + "," + zz + ")," + " origin=(" + ox + "," + oy + "," + oz + ")]";
+	}
+
+	public void toSegment(MemorySegment seg) {
+		seg.set(JAVA_DOUBLE, 0, xx);
+		seg.set(JAVA_DOUBLE, 8, xy);
+		seg.set(JAVA_DOUBLE, 16, xz);
+		seg.set(JAVA_DOUBLE, 24, yx);
+		seg.set(JAVA_DOUBLE, 32, yy);
+		seg.set(JAVA_DOUBLE, 40, yz);
+		seg.set(JAVA_DOUBLE, 48, zx);
+		seg.set(JAVA_DOUBLE, 56, zy);
+		seg.set(JAVA_DOUBLE, 64, zz);
+		seg.set(JAVA_DOUBLE, 72, ox);
+		seg.set(JAVA_DOUBLE, 80, oy);
+		seg.set(JAVA_DOUBLE, 88, oz);
+	}
+
+	public static Transform3D fromSegment(MemorySegment seg) {
+		Transform3D t = new Transform3D();
+		t.xx = seg.get(JAVA_DOUBLE, 0);
+		t.xy = seg.get(JAVA_DOUBLE, 8);
+		t.xz = seg.get(JAVA_DOUBLE, 16);
+		t.yx = seg.get(JAVA_DOUBLE, 24);
+		t.yy = seg.get(JAVA_DOUBLE, 32);
+		t.yz = seg.get(JAVA_DOUBLE, 40);
+		t.zx = seg.get(JAVA_DOUBLE, 48);
+		t.zy = seg.get(JAVA_DOUBLE, 56);
+		t.zz = seg.get(JAVA_DOUBLE, 64);
+		t.ox = seg.get(JAVA_DOUBLE, 72);
+		t.oy = seg.get(JAVA_DOUBLE, 80);
+		t.oz = seg.get(JAVA_DOUBLE, 88);
+		return t;
 	}
 }

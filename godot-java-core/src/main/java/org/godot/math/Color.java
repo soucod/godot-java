@@ -1,5 +1,8 @@
 package org.godot.math;
 
+import java.lang.foreign.MemorySegment;
+import static java.lang.foreign.ValueLayout.JAVA_FLOAT;
+
 /**
  * RGBA color. Values are in the range 0.0–1.0 for each channel. Memory layout:
  * 4 floats (r, g, b, a), 16 bytes total.
@@ -42,5 +45,17 @@ public final class Color {
 	public int hashCode() {
 		return Double.hashCode(r) ^ (Double.hashCode(g) * 31) ^ (Double.hashCode(b) * 961)
 				^ (Double.hashCode(a) * 29791);
+	}
+
+	public void toSegment(MemorySegment seg) {
+		seg.set(JAVA_FLOAT, 0, (float) r);
+		seg.set(JAVA_FLOAT, 4, (float) g);
+		seg.set(JAVA_FLOAT, 8, (float) b);
+		seg.set(JAVA_FLOAT, 12, (float) a);
+	}
+
+	public static Color fromSegment(MemorySegment seg) {
+		return new Color(seg.get(JAVA_FLOAT, 0), seg.get(JAVA_FLOAT, 4), seg.get(JAVA_FLOAT, 8),
+				seg.get(JAVA_FLOAT, 12));
 	}
 }

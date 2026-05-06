@@ -54,7 +54,7 @@ public class ExtensionApiParser {
 						List<ArgInfo> args = new ArrayList<>();
 						if (extMethod.arguments() != null) {
 							for (ClassExtensionInfoArg arg : extMethod.arguments()) {
-								args.add(new ArgInfo(arg.name(), arg.type(), arg.meta()));
+								args.add(new ArgInfo(arg.name(), arg.type(), arg.meta(), arg.default_value()));
 							}
 						}
 						String returnType = extMethod.return_value() != null ? extMethod.return_value().type() : null;
@@ -81,7 +81,7 @@ public class ExtensionApiParser {
 						List<ArgInfo> sigArgs = new ArrayList<>();
 						if (extSig.arguments() != null) {
 							for (ClassExtensionInfoArg arg : extSig.arguments()) {
-								sigArgs.add(new ArgInfo(arg.name(), arg.type(), arg.meta()));
+								sigArgs.add(new ArgInfo(arg.name(), arg.type(), arg.meta(), arg.default_value()));
 							}
 						}
 						signals.add(new SignalInfo(extSig.name(), sigArgs));
@@ -113,7 +113,20 @@ public class ExtensionApiParser {
 			for (BuiltinClass bc : api.builtin_classes()) {
 				List<Operator> operators = bc.operators() != null ? bc.operators() : new ArrayList<>();
 				List<Constructor> constructors = bc.constructors() != null ? bc.constructors() : new ArrayList<>();
-				result.put(bc.name(), new BuiltinClassInfo(bc.name(), operators, constructors));
+				List<BuiltinMethodInfo> methods = new ArrayList<>();
+				if (bc.methods() != null) {
+					for (BuiltinMethod bm : bc.methods()) {
+						List<ArgInfo> args = new ArrayList<>();
+						if (bm.arguments() != null) {
+							for (ClassExtensionInfoArg arg : bm.arguments()) {
+								args.add(new ArgInfo(arg.name(), arg.type(), arg.meta(), arg.default_value()));
+							}
+						}
+						methods.add(new BuiltinMethodInfo(bm.name(), bm.return_type(), bm.is_const(), bm.is_static(),
+								bm.is_vararg(), bm.hash(), args));
+					}
+				}
+				result.put(bc.name(), new BuiltinClassInfo(bc.name(), operators, constructors, methods));
 			}
 		}
 		return result;
@@ -142,7 +155,14 @@ public class ExtensionApiParser {
 	}
 
 	public record BuiltinClass(String name, @SerializedName("is_keyed") boolean is_keyed, List<Operator> operators,
-			List<Constructor> constructors, @SerializedName("has_destructor") boolean has_destructor) {
+			List<Constructor> constructors, @SerializedName("has_destructor") boolean has_destructor,
+			List<BuiltinMethod> methods) {
+	}
+
+	public record BuiltinMethod(String name, @SerializedName("return_type") String return_type, boolean is_const,
+			boolean is_static, boolean is_vararg, long hash,
+			@SerializedName("hash_compatibility") List<Long> hash_compatibility,
+			List<ClassExtensionInfoArg> arguments) {
 	}
 
 	public record Operator(String name, @SerializedName("right_type") String right_type,
@@ -182,7 +202,8 @@ public class ExtensionApiParser {
 	public record ClassExtensionInfoSignal(String name, List<ClassExtensionInfoArg> arguments) {
 	}
 
-	public record ClassExtensionInfoArg(String name, String type, String meta) {
+	public record ClassExtensionInfoArg(String name, String type, String meta,
+			@SerializedName("default_value") String default_value) {
 	}
 
 	public record UtilityFunction(String name, String type, String category) {

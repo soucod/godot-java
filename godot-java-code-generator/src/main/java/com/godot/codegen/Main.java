@@ -95,6 +95,17 @@ public class Main {
 		System.out.println("Generating " + singletons.size() + " singleton wrappers...");
 		SingletonGenerator.generate(singletons, classMap, outputDir);
 
+		// Generate builtin class method extensions
+		var builtinClasses = new java.util.ArrayList<BuiltinClassInfo>(parser.getBuiltinClasses().values());
+		int builtinWithMethods = 0;
+		for (var bc : builtinClasses) {
+			if (bc.methods() != null && !bc.methods().isEmpty()) {
+				builtinWithMethods++;
+			}
+		}
+		System.out.println("Generating " + builtinWithMethods + " builtin method extension classes...");
+		BuiltinMethodGenerator.generate(builtinClasses, outputDir);
+
 		// ---------------------------------------------------------------
 		// Phase 2: Generate API infrastructure from gdextension_interface.json
 		// ---------------------------------------------------------------

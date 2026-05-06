@@ -22,19 +22,19 @@ public class Spawner extends Node {
 		// Build initial node tree
 		Node player = Node.create();
 		player.setName("Player");
-		add_child(player, false, 0);
+		addChild(player, false, 0);
 
 		Node enemies = Node.create();
 		enemies.setName("Enemies");
-		add_child(enemies, false, 0);
+		addChild(enemies, false, 0);
 
 		Node enemy1 = Node.create();
 		enemy1.setName("Enemy1");
-		enemies.add_child(enemy1, false, 0);
+		enemies.addChild(enemy1, false, 0);
 
 		Node enemy2 = Node.create();
 		enemy2.setName("Enemy2");
-		enemies.add_child(enemy2, false, 0);
+		enemies.addChild(enemy2, false, 0);
 
 		logger.info("Initial tree:");
 		describeTree();
@@ -49,7 +49,7 @@ public class Spawner extends Node {
 
 	@GodotMethod
 	public void describeTree() {
-		Node[] children = get_children(false);
+		Node[] children = getChildren(false);
 		logger.info("--- Scene Tree ---");
 		logger.info("Spawner (children: {})", children.length);
 		for (int i = 0; i < children.length; i++) {
@@ -63,7 +63,7 @@ public class Spawner extends Node {
 	public void spawnChild(String name) {
 		Node child = Node.create();
 		child.setName(name);
-		add_child(child, false, 0);
+		addChild(child, false, 0);
 		logger.info("Spawned child: {}", name);
 	}
 }

@@ -180,6 +180,84 @@ public abstract class Godot {
 		}));
 	}
 
+	/**
+	 * Call a method on this object at the end of the current frame (deferred).
+	 * Equivalent to GDScript's call_deferred().
+	 */
+	public void callDeferred(String methodName, java.lang.Object... args) {
+		java.lang.Object[] combined = new java.lang.Object[(args != null ? args.length : 0) + 1];
+		combined[0] = methodName;
+		if (args != null && args.length > 0) {
+			System.arraycopy(args, 0, combined, 1, args.length);
+		}
+		call("call_deferred", combined);
+	}
+
+	/**
+	 * Call a static method on a Godot engine class. Uses the method bind with a
+	 * null object pointer, which is how the GDExtension API dispatches static
+	 * methods.
+	 */
+	protected static java.lang.Object callStatic(String className, String methodName, long hash,
+			java.lang.Object... args) {
+		return Bridge.runDowncall(() -> Bridge.runScoped(() -> {
+			int depth = Bridge.callDepth();
+			if (depth >= Bridge.MAX_CALL_DEPTH) {
+				throw new RuntimeException("Maximum call depth exceeded: " + depth);
+			}
+			int argc = args != null ? args.length : 0;
+			if (argc > Bridge.MAX_CALL_ARGS) {
+				throw new RuntimeException("Too many arguments: " + argc + " (max " + Bridge.MAX_CALL_ARGS + ")");
+			}
+
+			try {
+				Bridge.destroyVariant(Bridge.resultSlot(depth));
+				MemorySegment argPtrs;
+				if (argc > 0) {
+					argPtrs = Bridge.argPtrsSlot(depth);
+					for (int i = 0; i < argc; i++) {
+						MemorySegment slot = Bridge.argSlot(depth, i);
+						VariantUtils.fromObjectInto(args[i], slot);
+						argPtrs.set(ADDRESS, (long) i * ADDRESS.byteSize(), slot);
+					}
+				} else {
+					argPtrs = MemorySegment.NULL;
+				}
+
+				MemorySegment resultVar = Bridge.resultSlot(depth);
+				MemorySegment errorVar = Bridge.errorSlot(depth);
+
+				return Bridge.withCallDepth(depth, () -> {
+					MemorySegment methodBind = getCachedMethodBind(className, methodName, hash);
+					if (methodBind.address() == 0) {
+						throw new RuntimeException("Method bind not found: " + methodName + " on " + className);
+					}
+					Bridge.callVoid(ApiIndex.OBJECT_METHOD_BIND_CALL, methodBind, MemorySegment.NULL, argPtrs,
+							(long) argc, resultVar, errorVar);
+
+					int errorCode = errorVar.get(JAVA_INT, 0);
+					if (errorCode != 0) {
+						StringBuilder sb = new StringBuilder();
+						sb.append("Call error ").append(errorCode).append(" calling static ").append(className)
+								.append(".").append(methodName);
+						sb.append(" (arg=").append(errorVar.get(JAVA_INT, 4));
+						sb.append(", expected=").append(errorVar.get(JAVA_INT, 8)).append(")");
+						throw new RuntimeException(sb.toString());
+					}
+
+					Variant resultVariant = new Variant(resultVar);
+					return VariantUtils.toObject(resultVariant);
+				});
+			} finally {
+				if (args != null) {
+					for (int i = 0; i < argc; i++) {
+						Bridge.destroyVariant(Bridge.argSlot(depth, i));
+					}
+				}
+			}
+		}));
+	}
+
 	// ----------------------------------------------------------------
 	// Signal emission
 	// ----------------------------------------------------------------

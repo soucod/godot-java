@@ -77,66 +77,66 @@ public class PongGame extends Node2D {
 		double offsetX = (1152 - WIDTH) / 2;
 		double offsetY = (648 - HEIGHT) / 2;
 		container = Node2D.create();
-		container.call("set_position", new Vector2(offsetX, offsetY));
-		add_child(container, false, 0);
+		container.setPosition(new Vector2(offsetX, offsetY));
+		addChild(container, false, 0);
 
 		// Play area background
 		ColorRect bg = ColorRect.create();
-		bg.call("set_color", new org.godot.math.Color(0.05, 0.05, 0.1));
-		bg.call("set_size", new Vector2(WIDTH, HEIGHT));
-		container.add_child(bg, false, 0);
+		bg.setColor(new org.godot.math.Color(0.05, 0.05, 0.1));
+		bg.setSize(new Vector2(WIDTH, HEIGHT));
+		container.addChild(bg, false, 0);
 
 		// Center dashed line
 		for (int i = 0; i < HEIGHT; i += 20) {
 			ColorRect dash = ColorRect.create();
-			dash.call("set_color", new org.godot.math.Color(0.3, 0.3, 0.3));
-			dash.call("set_size", new Vector2(2, 10));
-			dash.call("set_position", new Vector2(WIDTH / 2 - 1, i));
-			container.add_child(dash, false, 0);
+			dash.setColor(new org.godot.math.Color(0.3, 0.3, 0.3));
+			dash.setSize(new Vector2(2, 10));
+			dash.setPosition(new Vector2(WIDTH / 2 - 1, i));
+			container.addChild(dash, false, 0);
 		}
 
 		// Ball
 		ball = ColorRect.create();
-		ball.call("set_color", new org.godot.math.Color(1, 1, 1));
-		ball.call("set_size", new Vector2(BALL_SIZE, BALL_SIZE));
-		container.add_child(ball, false, 0);
+		ball.setColor(new org.godot.math.Color(1, 1, 1));
+		ball.setSize(new Vector2(BALL_SIZE, BALL_SIZE));
+		container.addChild(ball, false, 0);
 
 		// Player paddle (left)
 		playerPaddle = ColorRect.create();
-		playerPaddle.call("set_color", new org.godot.math.Color(0.3, 0.7, 1.0));
-		playerPaddle.call("set_size", new Vector2(PADDLE_W, PADDLE_H));
-		container.add_child(playerPaddle, false, 0);
+		playerPaddle.setColor(new org.godot.math.Color(0.3, 0.7, 1.0));
+		playerPaddle.setSize(new Vector2(PADDLE_W, PADDLE_H));
+		container.addChild(playerPaddle, false, 0);
 
 		// AI paddle (right)
 		aiPaddle = ColorRect.create();
-		aiPaddle.call("set_color", new org.godot.math.Color(1.0, 0.4, 0.4));
-		aiPaddle.call("set_size", new Vector2(PADDLE_W, PADDLE_H));
-		container.add_child(aiPaddle, false, 0);
+		aiPaddle.setColor(new org.godot.math.Color(1.0, 0.4, 0.4));
+		aiPaddle.setSize(new Vector2(PADDLE_W, PADDLE_H));
+		container.addChild(aiPaddle, false, 0);
 
 		// Player score label
 		playerLabel = Label.create();
-		playerLabel.call("set_horizontal_alignment", 1); // CENTER
-		playerLabel.call("add_theme_font_size_override", "font_size", 48);
-		playerLabel.call("set_position", new Vector2(WIDTH / 4 - 30, 20));
-		playerLabel.call("set_size", new Vector2(60, 60));
-		container.add_child(playerLabel, false, 0);
+		playerLabel.setHorizontalAlignment(1); // CENTER
+		playerLabel.addThemeFontSizeOverride("font_size", 48);
+		playerLabel.setPosition(new Vector2(WIDTH / 4 - 30, 20));
+		playerLabel.setSize(new Vector2(60, 60));
+		container.addChild(playerLabel, false, 0);
 
 		// AI score label
 		aiLabel = Label.create();
-		aiLabel.call("set_horizontal_alignment", 1);
-		aiLabel.call("add_theme_font_size_override", "font_size", 48);
-		aiLabel.call("set_position", new Vector2(3 * WIDTH / 4 - 30, 20));
-		aiLabel.call("set_size", new Vector2(60, 60));
-		container.add_child(aiLabel, false, 0);
+		aiLabel.setHorizontalAlignment(1);
+		aiLabel.addThemeFontSizeOverride("font_size", 48);
+		aiLabel.setPosition(new Vector2(3 * WIDTH / 4 - 30, 20));
+		aiLabel.setSize(new Vector2(60, 60));
+		container.addChild(aiLabel, false, 0);
 
 		// Message label
 		messageLabel = Label.create();
-		messageLabel.call("set_horizontal_alignment", 1);
-		messageLabel.call("add_theme_font_size_override", "font_size", 24);
-		messageLabel.call("set_position", new Vector2(WIDTH / 2 - 150, HEIGHT / 2 - 20));
-		messageLabel.call("set_size", new Vector2(300, 40));
-		messageLabel.call("set_visible", false);
-		container.add_child(messageLabel, false, 0);
+		messageLabel.setHorizontalAlignment(1);
+		messageLabel.addThemeFontSizeOverride("font_size", 24);
+		messageLabel.setPosition(new Vector2(WIDTH / 2 - 150, HEIGHT / 2 - 20));
+		messageLabel.setSize(new Vector2(300, 40));
+		messageLabel.setVisible(false);
+		container.addChild(messageLabel, false, 0);
 
 		resetGame();
 		updateScoreDisplay();
@@ -148,12 +148,12 @@ public class PongGame extends Node2D {
 		Input input = Input.singleton();
 
 		// Input
-		double dir = input.get_axis("move_up", "move_down");
+		double dir = input.getAxis("move_up", "move_down");
 
 		// Restart
-		if (!running && input.is_action_just_pressed("ui_accept", false)) {
+		if (!running && input.isActionJustPressed("ui_accept", false)) {
 			resetGame();
-			messageLabel.call("set_visible", false);
+			messageLabel.setVisible(false);
 			updateScoreDisplay();
 		}
 
@@ -222,27 +222,27 @@ public class PongGame extends Node2D {
 		}
 
 		// Sync visual positions
-		ball.call("set_position", new Vector2(ballX - BALL_SIZE / 2, ballY - BALL_SIZE / 2));
-		playerPaddle.call("set_position", new Vector2(PADDLE_OFFSET, playerY - PADDLE_H / 2));
-		aiPaddle.call("set_position", new Vector2(WIDTH - PADDLE_OFFSET - PADDLE_W, aiY - PADDLE_H / 2));
+		ball.setPosition(new Vector2(ballX - BALL_SIZE / 2, ballY - BALL_SIZE / 2));
+		playerPaddle.setPosition(new Vector2(PADDLE_OFFSET, playerY - PADDLE_H / 2));
+		aiPaddle.setPosition(new Vector2(WIDTH - PADDLE_OFFSET - PADDLE_W, aiY - PADDLE_H / 2));
 	}
 
 	private void onScoreUpdate() {
-		call("emit_signal", "onScore", playerScore, aiScore);
+		emitSignal("onScore", playerScore, aiScore);
 		updateScoreDisplay();
 		if (!running) {
 			if (playerScore >= WIN_SCORE) {
-				messageLabel.call("set_text", "You Win! Press Space");
+				messageLabel.setText("You Win! Press Space");
 			} else {
-				messageLabel.call("set_text", "AI Wins! Press Space");
+				messageLabel.setText("AI Wins! Press Space");
 			}
-			messageLabel.call("set_visible", true);
+			messageLabel.setVisible(true);
 		}
 	}
 
 	private void updateScoreDisplay() {
-		playerLabel.call("set_text", String.valueOf(playerScore));
-		aiLabel.call("set_text", String.valueOf(aiScore));
+		playerLabel.setText(String.valueOf(playerScore));
+		aiLabel.setText(String.valueOf(aiScore));
 	}
 
 	private void bounceOffPaddle(double paddleYCenter, int directionX) {

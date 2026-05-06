@@ -1,5 +1,8 @@
 package org.godot.math;
 
+import java.lang.foreign.MemorySegment;
+import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
+
 /**
  * 2D axis-aligned bounding box (position + size). Memory layout: 2 Vector2
  * (position, size), 16 bytes total (float_32).
@@ -45,5 +48,17 @@ public final class Rect2 {
 	@Override
 	public String toString() {
 		return "[P:" + position + " S:" + size + "]";
+	}
+
+	public void toSegment(MemorySegment seg) {
+		seg.set(JAVA_DOUBLE, 0, position.x);
+		seg.set(JAVA_DOUBLE, 8, position.y);
+		seg.set(JAVA_DOUBLE, 16, size.x);
+		seg.set(JAVA_DOUBLE, 24, size.y);
+	}
+
+	public static Rect2 fromSegment(MemorySegment seg) {
+		return new Rect2(seg.get(JAVA_DOUBLE, 0), seg.get(JAVA_DOUBLE, 8), seg.get(JAVA_DOUBLE, 16),
+				seg.get(JAVA_DOUBLE, 24));
 	}
 }

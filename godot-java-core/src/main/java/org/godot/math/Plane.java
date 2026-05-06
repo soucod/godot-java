@@ -1,5 +1,8 @@
 package org.godot.math;
 
+import java.lang.foreign.MemorySegment;
+import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
+
 /**
  * Infinite 3D plane defined by a unit normal vector and a distance from origin.
  *
@@ -232,5 +235,17 @@ public final class Plane {
 	@Override
 	public String toString() {
 		return "Plane(normal=(" + x + ", " + y + ", " + z + "), d=" + d + ")";
+	}
+
+	public void toSegment(MemorySegment seg) {
+		seg.set(JAVA_DOUBLE, 0, x);
+		seg.set(JAVA_DOUBLE, 8, y);
+		seg.set(JAVA_DOUBLE, 16, z);
+		seg.set(JAVA_DOUBLE, 24, d);
+	}
+
+	public static Plane fromSegment(MemorySegment seg) {
+		return new Plane(seg.get(JAVA_DOUBLE, 0), seg.get(JAVA_DOUBLE, 8), seg.get(JAVA_DOUBLE, 16),
+				seg.get(JAVA_DOUBLE, 24));
 	}
 }

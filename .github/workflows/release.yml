@@ -62,6 +62,16 @@ jobs:
           revision = os.environ["REVISION"]
           root = Path("pom.xml")
           root_text = root.read_text()
+
+          def property_value(name):
+              match = re.search(rf"<{re.escape(name)}>\s*([^<]+)\s*</{re.escape(name)}>", root_text)
+              if not match:
+                  raise RuntimeError(f"Missing root POM property: {name}")
+              return match.group(1)
+
+          junit_version = property_value("junit.version")
+          log4j2_version = property_value("log4j2.version")
+
           root_text = root_text.replace("<version>${revision}</version>", f"<version>{revision}</version>", 1)
           root_text = re.sub(r"<revision>[^<]+</revision>", f"<revision>{revision}</revision>", root_text, count=1)
           root.write_text(root_text)
@@ -76,6 +86,38 @@ jobs:
               if "    <parent/>" not in text:
                   raise RuntimeError(f"Unexpected parent block in {path}")
               path.write_text(text.replace("    <parent/>", parent_with_coordinates, 1))
+
+          core = Path("godot-java-core/pom.xml")
+          core_text = core.read_text()
+          core_metadata = """
+
+              <url>https://github.com/youngledo/godot-java</url>
+
+              <licenses>
+                  <license>
+                      <name>Apache-2.0</name>
+                      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+                      <distribution>repo</distribution>
+                  </license>
+              </licenses>
+
+              <developers>
+                  <developer>
+                      <id>youngledo</id>
+                  </developer>
+              </developers>
+
+              <scm>
+                  <connection>scm:git:git@github.com:youngledo/godot-java.git</connection>
+                  <developerConnection>scm:git:git@github.com:youngledo/godot-java.git</developerConnection>
+                  <url>https://github.com/youngledo/godot-java</url>
+              </scm>"""
+          core_text = core_text.replace("    <description>Java binding for Godot 4.x via GDExtension and Panama FFI</description>", "    <description>Java binding for Godot 4.x via GDExtension and Panama FFI</description>" + core_metadata, 1)
+          core_text = core_text.replace("""            <artifactId>godot-java-code-generator</artifactId>\n            <optional>true</optional>""", f"""            <artifactId>godot-java-code-generator</artifactId>\n            <version>{revision}</version>\n            <optional>true</optional>""", 1)
+          core_text = core_text.replace("""            <artifactId>junit-jupiter</artifactId>""", f"""            <artifactId>junit-jupiter</artifactId>\n            <version>{junit_version}</version>\n            <scope>test</scope>""", 1)
+          core_text = core_text.replace("""            <artifactId>log4j-api</artifactId>""", f"""            <artifactId>log4j-api</artifactId>\n            <version>{log4j2_version}</version>""", 1)
+          core_text = core_text.replace("""            <artifactId>log4j-core</artifactId>""", f"""            <artifactId>log4j-core</artifactId>\n            <version>{log4j2_version}</version>\n            <scope>runtime</scope>""", 1)
+          core.write_text(core_text)
           PY
 
       - name: Build and publish

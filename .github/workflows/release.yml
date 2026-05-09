@@ -89,6 +89,8 @@ jobs:
 
           core = Path("godot-java-core/pom.xml")
           core_text = core.read_text()
+          core_coordinates = f"""    <groupId>io.github.youngledo</groupId>\n    <version>{revision}</version>\n"""
+          core_text = core_text.replace("    <artifactId>godot-java-core</artifactId>", core_coordinates + "    <artifactId>godot-java-core</artifactId>", 1)
           core_metadata = """
 
               <url>https://github.com/youngledo/godot-java</url>

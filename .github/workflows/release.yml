@@ -52,6 +52,32 @@ jobs:
       - name: Resolve release version
         run: echo "REVISION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
+      - name: Prepare Central publish POMs
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          revision = os.environ["REVISION"]
+          root = Path("pom.xml")
+          root_text = root.read_text()
+          root_text = root_text.replace("<version>${revision}</version>", f"<version>{revision}</version>", 1)
+          root_text = re.sub(r"<revision>[^<]+</revision>", f"<revision>{revision}</revision>", root_text, count=1)
+          root.write_text(root_text)
+
+          parent_with_coordinates = f"""    <parent>\n        <groupId>io.github.youngledo</groupId>\n        <artifactId>godot-java</artifactId>\n        <version>{revision}</version>\n    </parent>"""
+          for path in [
+              Path("godot-java-code-generator/pom.xml"),
+              Path("godot-java-core/pom.xml"),
+              Path("godot-java-examples/pom.xml"),
+          ]:
+              text = path.read_text()
+              if "    <parent/>" not in text:
+                  raise RuntimeError(f"Unexpected parent block in {path}")
+              path.write_text(text.replace("    <parent/>", parent_with_coordinates, 1))
+          PY
+
       - name: Build and publish
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}

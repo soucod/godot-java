@@ -69,9 +69,17 @@ jobs:
                   raise RuntimeError(f"Missing root POM property: {name}")
               return match.group(1)
 
+          def central_compatible_pom(text):
+              text = text.replace("http://maven.apache.org/POM/4.1.0", "http://maven.apache.org/POM/4.0.0")
+              text = text.replace("https://maven.apache.org/xsd/maven-4.1.0.xsd", "https://maven.apache.org/xsd/maven-4.0.0.xsd")
+              if "<modelVersion>" not in text:
+                  text = re.sub(r"(<project\b[^>]*>\s*)", r"\1    <modelVersion>4.0.0</modelVersion>\n", text, count=1, flags=re.S)
+              return text
+
           junit_version = property_value("junit.version")
           log4j2_version = property_value("log4j2.version")
 
+          root_text = central_compatible_pom(root_text)
           root_text = root_text.replace("<version>${revision}</version>", f"<version>{revision}</version>", 1)
           root_text = re.sub(r"<revision>[^<]+</revision>", f"<revision>{revision}</revision>", root_text, count=1)
           root.write_text(root_text)
@@ -82,10 +90,10 @@ jobs:
               Path("godot-java-core/pom.xml"),
               Path("godot-java-examples/pom.xml"),
           ]:
-              text = path.read_text()
-              if "    <parent/>" not in text:
+              text = central_compatible_pom(path.read_text())
+              if "<parent/>" not in text:
                   raise RuntimeError(f"Unexpected parent block in {path}")
-              path.write_text(text.replace("    <parent/>", parent_with_coordinates, 1))
+              path.write_text(re.sub(r"\s*<parent/>\s*", "\n" + parent_with_coordinates + "\n\n", text, count=1))
 
           core = Path("godot-java-core/pom.xml")
           core_text = core.read_text()

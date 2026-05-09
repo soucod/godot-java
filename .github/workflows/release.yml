@@ -49,8 +49,11 @@ jobs:
           </settings>
           EOF
 
+      - name: Resolve release version
+        run: echo "REVISION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
       - name: Build and publish
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
-        run: ./mvnw deploy -P release -DskipTests -B
+        run: ./mvnw deploy -P release -Drevision="$REVISION" -DskipTests -B

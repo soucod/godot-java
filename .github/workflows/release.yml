@@ -56,4 +56,4 @@ jobs:
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
-        run: ./mvnw deploy -P release -Drevision="$REVISION" -DskipTests -B
+        run: ./mvnw deploy central-publishing:publish -P release -Drevision="$REVISION" -DskipTests -B

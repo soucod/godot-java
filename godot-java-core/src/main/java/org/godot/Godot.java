@@ -17,6 +17,9 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
 
 public abstract class Godot {
 
+	public static final int NOTIFICATION_ACCESSIBILITY_UPDATE = 3000;
+	public static final int NOTIFICATION_ACCESSIBILITY_INVALIDATE = 3001;
+
 	private static final Logger logger = LogManager.getLogger(Godot.class);
 
 	/** Cache: "className::methodName" → MethodBind pointer. Never evicted. */
@@ -395,7 +398,23 @@ public abstract class Godot {
 		return null;
 	}
 
+	public void _notification(int what) {
+	}
+
+	public void _accessibilityUpdate() {
+	}
+
+	public void _accessibilityInvalidate() {
+	}
+
 	public void onNotification(int what) {
+		_notification(what);
+		switch (what) {
+			case NOTIFICATION_ACCESSIBILITY_UPDATE -> _accessibilityUpdate();
+			case NOTIFICATION_ACCESSIBILITY_INVALIDATE -> _accessibilityInvalidate();
+			default -> {
+			}
+		}
 	}
 
 	// ----------------------------------------------------------------

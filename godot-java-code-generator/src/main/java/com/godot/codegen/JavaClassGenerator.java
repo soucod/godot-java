@@ -50,7 +50,7 @@ public class JavaClassGenerator {
 		addResolveMethodHash(classBuilder, classInfo);
 		addConvenienceMethods(classBuilder, classInfo);
 
-		JavaFile.Builder fileBuilder = JavaFile.builder(packageName, classBuilder.build()).skipJavaLangImports(true)
+		JavaFile.Builder fileBuilder = JavaFile.builder(packageName, classBuilder.build()).skipJavaLangImports(false)
 				.indent("\t");
 		return fileBuilder;
 	}
@@ -62,6 +62,52 @@ public class JavaClassGenerator {
 	 */
 	private void addConvenienceMethods(TypeSpec.Builder builder, ClassInfo classInfo) {
 		String name = classInfo.name();
+
+		if ("Object".equals(name)) {
+			MethodBindRef bytesToVarBind = findMethodBind(classInfo, "bytes_to_var");
+			builder.addMethod(MethodSpec.methodBuilder("bytesToVar").addModifiers(Modifier.PUBLIC)
+					.returns(java.lang.Object.class).addParameter(byte[].class, "bytes")
+					.addStatement("return callEngine($S, $S, $LL, new java.lang.Object[] { bytes })",
+							bytesToVarBind.className(), "bytes_to_var", bytesToVarBind.hash())
+					.build());
+
+			MethodBindRef bytesToVarWithObjectsBind = findMethodBind(classInfo, "bytes_to_var_with_objects");
+			builder.addMethod(MethodSpec.methodBuilder("bytesToVarWithObjects").addModifiers(Modifier.PUBLIC)
+					.returns(java.lang.Object.class).addParameter(byte[].class, "bytes")
+					.addStatement("return callEngine($S, $S, $LL, new java.lang.Object[] { bytes })",
+							bytesToVarWithObjectsBind.className(), "bytes_to_var_with_objects",
+							bytesToVarWithObjectsBind.hash())
+					.build());
+
+			MethodBindRef varToStrBind = findMethodBind(classInfo, "var_to_str");
+			builder.addMethod(MethodSpec.methodBuilder("varToStr").addModifiers(Modifier.PUBLIC).returns(String.class)
+					.addParameter(java.lang.Object.class, "value")
+					.addStatement("return (String) callEngine($S, $S, $LL, new java.lang.Object[] { value })",
+							varToStrBind.className(), "var_to_str", varToStrBind.hash())
+					.build());
+
+			MethodBindRef strToVarBind = findMethodBind(classInfo, "str_to_var");
+			builder.addMethod(MethodSpec.methodBuilder("strToVar").addModifiers(Modifier.PUBLIC)
+					.returns(java.lang.Object.class).addParameter(String.class, "value")
+					.addStatement("return callEngine($S, $S, $LL, new java.lang.Object[] { value })",
+							strToVarBind.className(), "str_to_var", strToVarBind.hash())
+					.build());
+
+			MethodBindRef getStringFromUtf8Bind = findMethodBind(classInfo, "get_string_from_utf8");
+			builder.addMethod(MethodSpec.methodBuilder("getStringFromUtf8").addModifiers(Modifier.PUBLIC)
+					.returns(String.class).addParameter(byte[].class, "bytes")
+					.addStatement("return (String) callEngine($S, $S, $LL, new java.lang.Object[] { bytes })",
+							getStringFromUtf8Bind.className(), "get_string_from_utf8", getStringFromUtf8Bind.hash())
+					.build());
+
+			MethodBindRef isInstanceValidBind = findMethodBind(classInfo, "is_instance_valid");
+			builder.addMethod(
+					MethodSpec.methodBuilder("isInstanceValid").addModifiers(Modifier.PUBLIC).returns(boolean.class)
+							.addParameter(java.lang.Object.class, "value")
+							.addStatement("return (boolean) callEngine($S, $S, $LL, new java.lang.Object[] { value })",
+									isInstanceValidBind.className(), "is_instance_valid", isInstanceValidBind.hash())
+							.build());
+		}
 
 		if ("Node".equals(name)) {
 			ClassName nodeType = ClassName.get(packageName, "Node");
@@ -76,6 +122,54 @@ public class JavaClassGenerator {
 							.build())
 					.addStatement("$T node = getNode(path)", nodeType).addStatement("if (node == null) return null")
 					.addStatement("return ($T) node", TypeVariableName.get("T")).build());
+
+			// rpc(String method, Object... args) - varargs overload for RPC with extra
+			// arguments.
+			// The Godot API declares rpc as is_vararg, meaning additional arguments after
+			// "method" are forwarded to the remote method call.
+			MethodBindRef rpcBind = findMethodBind(classInfo, "rpc");
+			builder.addMethod(MethodSpec.methodBuilder("rpc").addModifiers(Modifier.PUBLIC).returns(int.class)
+					.addParameter(String.class, "method").addParameter(ArrayTypeName.of(Object.class), "args")
+					.varargs(true).addStatement("java.lang.Object[] allArgs = new java.lang.Object[1 + args.length]")
+					.addStatement("allArgs[0] = (java.lang.Object) method")
+					.addStatement("$T.arraycopy(args, 0, allArgs, 1, args.length)", System.class)
+					.addStatement("return (int) callEngine($S, $S, $LL, allArgs)", rpcBind.className(), "rpc",
+							rpcBind.hash())
+					.build());
+
+			// rpcId(long peer_id, String method, Object... args) - varargs overload.
+			// The Godot API declares rpc_id as is_vararg with additional args forwarded.
+			MethodBindRef rpcIdBind = findMethodBind(classInfo, "rpc_id");
+			builder.addMethod(MethodSpec.methodBuilder("rpcId").addModifiers(Modifier.PUBLIC).returns(int.class)
+					.addParameter(long.class, "peer_id").addParameter(String.class, "method")
+					.addParameter(ArrayTypeName.of(Object.class), "args").varargs(true)
+					.addStatement("java.lang.Object[] allArgs = new java.lang.Object[2 + args.length]")
+					.addStatement("allArgs[0] = java.lang.Long.valueOf(peer_id)")
+					.addStatement("allArgs[1] = (java.lang.Object) method")
+					.addStatement("$T.arraycopy(args, 0, allArgs, 2, args.length)", System.class)
+					.addStatement("return (int) callEngine($S, $S, $LL, allArgs)", rpcIdBind.className(), "rpc_id",
+							rpcIdBind.hash())
+					.build());
+		}
+
+		if ("MultiplayerSpawner".equals(name)) {
+			ClassName nodeType = ClassName.get(packageName, "Node");
+			MethodBindRef spawnBind = findMethodBind(classInfo, "spawn");
+
+			builder.addMethod(MethodSpec.methodBuilder("spawnData").addModifiers(Modifier.PUBLIC).returns(nodeType)
+					.addParameter(ArrayTypeName.of(TypeName.get(java.lang.Object.class)), "data").varargs(true)
+					.addStatement("return ($T) callEngine($S, $S, $LL, new java.lang.Object[] { data })", nodeType,
+							spawnBind.className(), "spawn", spawnBind.hash())
+					.build());
+		}
+
+		if ("Image".equals(name)) {
+			MethodBindRef getDataBind = findMethodBind(classInfo, "get_data");
+			builder.addMethod(
+					MethodSpec.methodBuilder("getImageData").addModifiers(Modifier.PUBLIC).returns(byte[].class)
+							.addStatement("return (byte[]) callEngine($S, $S, $LL, new java.lang.Object[0])",
+									getDataBind.className(), "get_data", getDataBind.hash())
+							.build());
 		}
 
 		if ("PackedScene".equals(name)) {
@@ -318,10 +412,11 @@ public class JavaClassGenerator {
 				methodBuilder.addModifiers(Modifier.PUBLIC);
 				if (!returnType.equals("void")) {
 					methodBuilder.returns(toTypeName(returnType));
-					methodBuilder.addStatement("return ($T) super.call($S$L)", toTypeName(returnType), method.name(),
-							callArgs);
+					methodBuilder.addStatement("return ($T) callEngine($S, $S, $L$L)", toTypeName(returnType),
+							classInfo.name(), method.name(), method.hash() + "L", callArgs);
 				} else {
-					methodBuilder.addStatement("super.call($S$L)", method.name(), callArgs);
+					methodBuilder.addStatement("callEngine($S, $S, $L$L)", classInfo.name(), method.name(),
+							method.hash() + "L", callArgs);
 				}
 			}
 
@@ -539,6 +634,25 @@ public class JavaClassGenerator {
 		return result;
 	}
 
+	private record MethodBindRef(String className, long hash) {
+	}
+
+	private MethodBindRef findMethodBind(ClassInfo classInfo, String methodName) {
+		String currentName = classInfo.name();
+		while (currentName != null && !currentName.isEmpty()) {
+			ClassInfo current = classMap.get(currentName);
+			if (current == null)
+				break;
+			for (MethodInfo method : current.methods()) {
+				if (method.name().equals(methodName)) {
+					return new MethodBindRef(current.name(), method.hash());
+				}
+			}
+			currentName = current.inherits();
+		}
+		return new MethodBindRef(classInfo.name(), 0L);
+	}
+
 	/**
 	 * Add property getter/setter methods.
 	 */
@@ -569,9 +683,11 @@ public class JavaClassGenerator {
 				continue;
 			}
 
+			MethodBindRef getterBind = findMethodBind(classInfo, getterMethod);
 			MethodSpec getterSpec = MethodSpec.methodBuilder(getterName).addModifiers(Modifier.PUBLIC)
-					.returns(toTypeName(javaType)).addStatement("return ($T) super.call($S, new java.lang.Object[0])",
-							toTypeName(javaType), getterMethod)
+					.returns(toTypeName(javaType))
+					.addStatement("return ($T) callEngine($S, $S, $LL, new java.lang.Object[0])", toTypeName(javaType),
+							getterBind.className(), getterMethod, getterBind.hash())
 					.build();
 			builder.addMethod(getterSpec);
 
@@ -583,10 +699,11 @@ public class JavaClassGenerator {
 
 			String setterName = "set" + capitalize(javaPropName);
 
+			MethodBindRef setterBind = findMethodBind(classInfo, setterMethod);
 			MethodSpec setterSpec = MethodSpec.methodBuilder(setterName).addModifiers(Modifier.PUBLIC)
 					.addParameter(toTypeName(javaType), "value")
-					.addStatement("super.call($S, new java.lang.Object[] { " + boxToObject("value", javaType) + " })",
-							setterMethod)
+					.addStatement("callEngine($S, $S, $LL, new java.lang.Object[] { " + boxToObject("value", javaType)
+							+ " })", setterBind.className(), setterMethod, setterBind.hash())
 					.build();
 			builder.addMethod(setterSpec);
 		}
@@ -657,7 +774,11 @@ public class JavaClassGenerator {
 
 	private TypeName toTypeName(String type) {
 		if (type == null || type.isEmpty()) {
-			return ClassName.get("java.lang", "Object");
+			return TypeName.get(java.lang.Object.class);
+		}
+
+		if (type.equals("Object") || type.equals("java.lang.Object")) {
+			return TypeName.get(java.lang.Object.class);
 		}
 
 		if (type.endsWith("[]")) {
@@ -670,12 +791,7 @@ public class JavaClassGenerator {
 			return ClassName.get(CROSS_PACKAGE_TYPES.get(type), type);
 		}
 
-		// "Object" from TypeMapper (Variant return) -> java.lang.Object
-		if (type.equals("Object")) {
-			return ClassName.get("java.lang", "Object");
-		}
-
-		return ClassName.get("", type);
+		return ClassName.get(packageName, type);
 	}
 
 	// ------------------------------------------------------------------

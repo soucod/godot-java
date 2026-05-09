@@ -29,19 +29,19 @@ public class BuiltinMethodGenerator {
 			"Vector4", "Vector4i", "Rect2", "Rect2i", "Transform2D", "Plane", "Quaternion", "AABB", "Basis",
 			"Transform3D", "Color");
 
-	// Only generate for types that have toSegment/fromSegment methods
-	private static final Map<String, Integer> VARIANT_TYPE_IDS = Map.ofEntries(Map.entry("Vector2", 5),
-			Map.entry("Vector2i", 6), Map.entry("Rect2", 7), Map.entry("Rect2i", 8), Map.entry("Vector3", 9),
-			Map.entry("Vector3i", 10), Map.entry("Transform2D", 11), Map.entry("Vector4", 12),
+	// Only generate for types whose storage layout is known here.
+	private static final Map<String, Integer> VARIANT_TYPE_IDS = Map.ofEntries(Map.entry("String", 4),
+			Map.entry("Vector2", 5), Map.entry("Vector2i", 6), Map.entry("Rect2", 7), Map.entry("Rect2i", 8),
+			Map.entry("Vector3", 9), Map.entry("Vector3i", 10), Map.entry("Transform2D", 11), Map.entry("Vector4", 12),
 			Map.entry("Vector4i", 13), Map.entry("Plane", 14), Map.entry("Quaternion", 15), Map.entry("AABB", 16),
 			Map.entry("Basis", 17), Map.entry("Transform3D", 18), Map.entry("Color", 20));
 
-	private static final Map<String, Integer> TYPE_SIZES = Map.ofEntries(Map.entry("Vector2", 16),
-			Map.entry("Vector2i", 8), Map.entry("Vector3", 24), Map.entry("Vector3i", 12), Map.entry("Vector4", 32),
-			Map.entry("Vector4i", 16), Map.entry("Rect2", 32), Map.entry("Rect2i", 16), Map.entry("Transform2D", 48),
-			Map.entry("Plane", 32), Map.entry("Quaternion", 32), Map.entry("AABB", 48), Map.entry("Basis", 72),
-			Map.entry("Transform3D", 96), Map.entry("Color", 16), Map.entry("bool", 1), Map.entry("int", 8),
-			Map.entry("float", 8), Map.entry("double", 8));
+	private static final Map<String, Integer> TYPE_SIZES = Map.ofEntries(Map.entry("String", 16),
+			Map.entry("Vector2", 16), Map.entry("Vector2i", 8), Map.entry("Vector3", 24), Map.entry("Vector3i", 12),
+			Map.entry("Vector4", 32), Map.entry("Vector4i", 16), Map.entry("Rect2", 32), Map.entry("Rect2i", 16),
+			Map.entry("Transform2D", 48), Map.entry("Plane", 32), Map.entry("Quaternion", 32), Map.entry("AABB", 48),
+			Map.entry("Basis", 72), Map.entry("Transform3D", 96), Map.entry("Color", 16), Map.entry("bool", 1),
+			Map.entry("int", 8), Map.entry("float", 8), Map.entry("double", 8));
 
 	public static void generate(List<BuiltinClassInfo> builtinClasses, String outputDir) throws IOException {
 		for (BuiltinClassInfo bc : builtinClasses) {
@@ -115,7 +115,11 @@ public class BuiltinMethodGenerator {
 		MethodSpec.Builder mb = MethodSpec.methodBuilder(javaMethodName).addModifiers(Modifier.PUBLIC, Modifier.STATIC);
 
 		if (!isStatic) {
-			mb.addParameter(ClassName.get(MATH_PACKAGE, selfType), "self");
+			if (selfType.equals("String")) {
+				mb.addParameter(String.class, "self");
+			} else {
+				mb.addParameter(ClassName.get(MATH_PACKAGE, selfType), "self");
+			}
 		}
 
 		// Build parameter info
@@ -150,6 +154,10 @@ public class BuiltinMethodGenerator {
 		// Allocate base segment (self value for instance methods, NULL for static)
 		if (isStatic) {
 			mb.addStatement("$T base = $T.NULL", ClassName.bestGuess(MS_CLASS), ClassName.bestGuess(MS_CLASS));
+		} else if (selfType.equals("String")) {
+			mb.addStatement("$T godotSelf = $T.fromJavaString(self)", ClassName.get("org.godot.core", "GodotString"),
+					ClassName.get("org.godot.core", "GodotString"));
+			mb.addStatement("$T base = godotSelf.segment()", ClassName.bestGuess(MS_CLASS));
 		} else {
 			mb.addStatement("$T base = arena.allocate($L, 8)", ClassName.bestGuess(MS_CLASS), selfSize);
 			mb.addStatement("self.toSegment(base)");

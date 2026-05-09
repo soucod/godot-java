@@ -193,12 +193,22 @@ public abstract class Godot {
 		call("call_deferred", combined);
 	}
 
+	protected java.lang.Object callEngine(String className, String methodName, long hash, java.lang.Object... args) {
+		checkValid();
+		return callMethodBind(className, methodName, hash, MemorySegment.ofAddress(nativeObject), args);
+	}
+
 	/**
 	 * Call a static method on a Godot engine class. Uses the method bind with a
 	 * null object pointer, which is how the GDExtension API dispatches static
 	 * methods.
 	 */
 	protected static java.lang.Object callStatic(String className, String methodName, long hash,
+			java.lang.Object... args) {
+		return callMethodBind(className, methodName, hash, MemorySegment.NULL, args);
+	}
+
+	private static java.lang.Object callMethodBind(String className, String methodName, long hash, MemorySegment object,
 			java.lang.Object... args) {
 		return Bridge.runDowncall(() -> Bridge.runScoped(() -> {
 			int depth = Bridge.callDepth();
@@ -232,14 +242,14 @@ public abstract class Godot {
 					if (methodBind.address() == 0) {
 						throw new RuntimeException("Method bind not found: " + methodName + " on " + className);
 					}
-					Bridge.callVoid(ApiIndex.OBJECT_METHOD_BIND_CALL, methodBind, MemorySegment.NULL, argPtrs,
-							(long) argc, resultVar, errorVar);
+					Bridge.callVoid(ApiIndex.OBJECT_METHOD_BIND_CALL, methodBind, object, argPtrs, (long) argc,
+							resultVar, errorVar);
 
 					int errorCode = errorVar.get(JAVA_INT, 0);
 					if (errorCode != 0) {
 						StringBuilder sb = new StringBuilder();
-						sb.append("Call error ").append(errorCode).append(" calling static ").append(className)
-								.append(".").append(methodName);
+						sb.append("Call error ").append(errorCode).append(" calling ").append(className).append(".")
+								.append(methodName);
 						sb.append(" (arg=").append(errorVar.get(JAVA_INT, 4));
 						sb.append(", expected=").append(errorVar.get(JAVA_INT, 8)).append(")");
 						throw new RuntimeException(sb.toString());

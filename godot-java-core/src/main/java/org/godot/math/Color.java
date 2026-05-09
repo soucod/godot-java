@@ -58,4 +58,34 @@ public final class Color {
 		return new Color(seg.get(JAVA_FLOAT, 0), seg.get(JAVA_FLOAT, 4), seg.get(JAVA_FLOAT, 8),
 				seg.get(JAVA_FLOAT, 12));
 	}
+
+	public static Color fromHsv(double h, double s, double v) {
+		return fromHsv(h, s, v, 1.0);
+	}
+
+	public static Color fromHsv(double h, double s, double v, double a) {
+		h = h - Math.floor(h);
+		s = Math.max(0.0, Math.min(1.0, s));
+		v = Math.max(0.0, Math.min(1.0, v));
+
+		if (s == 0.0) {
+			return new Color(v, v, v, a);
+		}
+
+		double sector = h * 6.0;
+		int i = (int) Math.floor(sector);
+		double f = sector - i;
+		double p = v * (1.0 - s);
+		double q = v * (1.0 - s * f);
+		double t = v * (1.0 - s * (1.0 - f));
+
+		return switch (i % 6) {
+			case 0 -> new Color(v, t, p, a);
+			case 1 -> new Color(q, v, p, a);
+			case 2 -> new Color(p, v, t, a);
+			case 3 -> new Color(p, q, v, a);
+			case 4 -> new Color(t, p, v, a);
+			default -> new Color(v, p, q, a);
+		};
+	}
 }

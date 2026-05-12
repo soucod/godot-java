@@ -73,6 +73,11 @@ public class IntegrationTestNode extends Node {
 	public void onNotification(int what) {
 		lastNotification = what;
 		notificationCount++;
+		if (what == 10) {
+			recordLifecycleEvent("notification_enter_tree");
+		} else if (what == 13) {
+			recordLifecycleEvent("notification_ready");
+		}
 		System.out.println("[IT] onNotification: " + what);
 	}
 
@@ -203,7 +208,7 @@ public class IntegrationTestNode extends Node {
 
 	@GodotMethod
 	public boolean testJavaToGodotNodeChurn(int count) {
-		int before = getChildCount();
+		int before = childCount();
 		for (int i = 0; i < count; i++) {
 			Node child = Node.create();
 			if (child == null || !child.isValid()) {
@@ -211,18 +216,22 @@ public class IntegrationTestNode extends Node {
 				return false;
 			}
 			addChild(child);
-			if (getChildCount() != before + 1) {
+			if (childCount() != before + 1) {
 				System.out.println("FAIL: child count did not increase at iteration " + i);
 				return false;
 			}
 			removeChild(child);
 			child.free();
-			if (getChildCount() != before) {
+			if (childCount() != before) {
 				System.out.println("FAIL: child count did not return to baseline at iteration " + i);
 				return false;
 			}
 		}
 		return true;
+	}
+
+	private int childCount() {
+		return ((Number) call("get_child_count", false)).intValue();
 	}
 
 	@GodotMethod

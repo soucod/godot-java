@@ -177,6 +177,7 @@ jobs:
           def central_compatible_pom(text):
               text = text.replace("http://maven.apache.org/POM/4.1.0", "http://maven.apache.org/POM/4.0.0")
               text = text.replace("https://maven.apache.org/xsd/maven-4.1.0.xsd", "https://maven.apache.org/xsd/maven-4.0.0.xsd")
+              text = text.replace("<modelVersion>4.1.0</modelVersion>", "<modelVersion>4.0.0</modelVersion>")
               if "<modelVersion>" not in text:
                   text = re.sub(r"(<project\b[^>]*>\s*)", r"\1    <modelVersion>4.0.0</modelVersion>\n", text, count=1, flags=re.S)
               return text

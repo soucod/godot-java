@@ -188,6 +188,9 @@ jobs:
           root_text = central_compatible_pom(root_text)
           root_text = root_text.replace("<version>${revision}</version>", f"<version>{revision}</version>", 1)
           root_text = re.sub(r"<revision>[^<]+</revision>", f"<revision>{revision}</revision>", root_text, count=1)
+          root_modules = """    <modules>\n        <module>godot-java-code-generator</module>\n        <module>godot-java-core</module>\n        <module>godot-java-examples</module>\n        <module>godot-java-native</module>\n    </modules>\n\n"""
+          if "<modules>" not in root_text:
+              root_text = root_text.replace("    <licenses>", root_modules + "    <licenses>", 1)
           root.write_text(root_text)
 
           parent_with_coordinates = f"""    <parent>\n        <groupId>io.github.youngledo</groupId>\n        <artifactId>godot-java</artifactId>\n        <version>{revision}</version>\n    </parent>"""
@@ -238,7 +241,7 @@ jobs:
 
           examples = Path("godot-java-examples/pom.xml")
           examples_text = examples.read_text()
-          examples_text = examples_text.replace("""            <artifactId>godot-java-core</artifactId>\n            <version>${revision}</version>""", f"""            <artifactId>godot-java-core</artifactId>\n            <version>{revision}</version>""", 1)
+          examples_text = examples_text.replace("""            <artifactId>godot-java-core</artifactId>""", f"""            <artifactId>godot-java-core</artifactId>\n            <version>{revision}</version>""", 1)
           examples.write_text(examples_text)
           PY
 
@@ -246,7 +249,7 @@ jobs:
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
-        run: ./mvnw deploy central-publishing:publish -P release -Drevision="$REVISION" -Dgodot.java.native.attach.dir="$PWD/dist/native" -DskipTests -B
+        run: ./mvnw deploy -P release -Drevision="$REVISION" -Dgodot.java.native.attach.dir="$PWD/dist/native" -DskipTests -B
 
       - name: Attach native fallback artifacts to GitHub Release
         uses: softprops/action-gh-release@v2

@@ -8,7 +8,7 @@ ENGLISH | [中文](README_ZH.md)
 
 > Write Godot 4.6 game logic in Java 25+ using Panama FFI
 
-- [Getting Started](en/user/getting-started.md) -- Prerequisites, Maven setup, first class
+- [Getting Started](en/user/getting-started.md) -- Template project, Maven setup, first Java class
 - [API Reference](en/user/api.md) -- Annotations, types, core classes
 - [Development Guide](en/user/guide.md) -- Step-by-step game entity, virtual methods, signals
 - [Troubleshooting](en/user/troubleshooting.md) -- Common errors and solutions

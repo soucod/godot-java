@@ -37,7 +37,7 @@ export JAVA_HOME=/usr/lib/jvm/java-25              # Linux
 
 **Symptom:**
 ```
-ERROR: Can't load library: res://native/libgodot-java.so
+ERROR: Can't open dynamic library: godot-java/libgodot-java.so
 ```
 
 **Cause:** Missing library, wrong path in `.gdextension`, or architecture mismatch.
@@ -46,8 +46,8 @@ ERROR: Can't load library: res://native/libgodot-java.so
 
 1. Verify the library file exists:
 ```bash
-ls -lh native/libgodot-java.dylib    # macOS
-file native/libgodot-java.dylib       # check architecture
+ls -lh godot-java/libgodot-java.dylib    # macOS
+file godot-java/libgodot-java.dylib       # check architecture
 ```
 
 2. Check `.gdextension` configuration:
@@ -57,19 +57,24 @@ entry_symbol = "godot_java_init"
 compatibility_minimum = 4.6
 
 [libraries]
-macos.debug = "res://native/libgodot-java.dylib"
-macos.release = "res://native/libgodot-java.dylib"
+macos.debug = "res://godot-java/libgodot-java.dylib"
+macos.release = "res://godot-java/libgodot-java.dylib"
+linux.debug = "res://godot-java/libgodot-java.so"
+linux.release = "res://godot-java/libgodot-java.so"
+windows.debug = "res://godot-java/libgodot-java.dll"
+windows.release = "res://godot-java/libgodot-java.dll"
 ```
 
 Common mistakes:
 - Wrong file extension (`.dll` vs `.so` vs `.dylib`).
 - Wrong platform key (`macos` not `osx`).
-- Incorrect path (`res://native/` not `res://../native/`).
+- Incorrect path (`res://godot-java/` should match the project-local runtime directory).
+- Running `mvn compile` instead of `mvn package`; the template syncs runtime files during `package`.
 
 3. Check library dependencies:
 ```bash
-otool -L native/libgodot-java.dylib    # macOS
-ldd native/libgodot-java.so             # Linux
+otool -L godot-java/libgodot-java.dylib    # macOS
+ldd godot-java/libgodot-java.so             # Linux
 ```
 
 ---
@@ -109,7 +114,7 @@ Verify the dependency in `pom.xml`:
 <dependency>
     <groupId>io.github.youngledo</groupId>
     <artifactId>godot-java-core</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.2</version>
 </dependency>
 ```
 

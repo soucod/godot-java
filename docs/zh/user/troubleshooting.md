@@ -65,7 +65,7 @@ C++ 层会按以下优先级搜索 JVM 库：
 **症状**
 
 ```
-ERROR: Can't load library: res://native/libgodot-java.dylib
+ERROR: Can't open dynamic library: godot-java/libgodot-java.dylib
 ```
 
 **原因**
@@ -79,8 +79,8 @@ ERROR: Can't load library: res://native/libgodot-java.dylib
 1. 确认库文件存在：
 
 ```bash
-ls -lh native/libgodot-java.dylib
-file native/libgodot-java.dylib
+ls -lh godot-java/libgodot-java.dylib
+file godot-java/libgodot-java.dylib
 # macOS 应显示: Mach-O 64-bit dynamically linked shared library arm64
 ```
 
@@ -92,27 +92,32 @@ entry_symbol = "godot_java_init"
 compatibility_minimum = 4.6
 
 [libraries]
-macos.debug = "res://native/libgodot-java.dylib"
-macos.release = "res://native/libgodot-java.dylib"
+macos.debug = "res://godot-java/libgodot-java.dylib"
+macos.release = "res://godot-java/libgodot-java.dylib"
+linux.debug = "res://godot-java/libgodot-java.so"
+linux.release = "res://godot-java/libgodot-java.so"
+windows.debug = "res://godot-java/libgodot-java.dll"
+windows.release = "res://godot-java/libgodot-java.dll"
 ```
 
 常见错误：
 - 文件扩展名错误（`.dll` vs `.so` vs `.dylib`）
 - 平台名称错误（应为 `macos`，不是 `osx`）
-- 路径使用了 `../` 相对路径（应使用 `res://` 绝对路径）
+- 路径没有指向标准运行目录 `res://godot-java/`
 - `compatibility_minimum` 设为 4.2 而不是 4.6
+- 只执行了 `mvn compile`；模板在 `mvn package` 阶段同步运行时文件
 
 3. 检查库的依赖项：
 
 ```bash
-otool -L native/libgodot-java.dylib   # macOS
-ldd native/libgodot-java.so            # Linux
+otool -L godot-java/libgodot-java.dylib   # macOS
+ldd godot-java/libgodot-java.so            # Linux
 ```
 
 4. 确保文件有执行权限：
 
 ```bash
-chmod +x native/libgodot-java.dylib
+chmod +x godot-java/libgodot-java.dylib
 ```
 
 ---

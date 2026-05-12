@@ -1,117 +1,85 @@
 # 快速上手
 
-5 分钟完成 godot-java 安装、配置并运行第一个示例。
+使用 `godot-java` 创建一个能运行 Java 游戏逻辑的 Godot 桌面项目。
 
 ## 前置条件
 
-| 工具 | 最低版本     | 说明 |
-|------|----------|------|
-| JDK | **25+**  | Panama FFI (`java.lang.foreign`) 必需 |
-| Godot | **4.6+** | GDExtension 支持 |
-| Maven | 4.0.x（项目含 Wrapper） | 构建工具，可用 `./mvnw` 替代 |
+| 工具 | 最低版本 | 验证命令 |
+|---|---:|---|
+| JDK | 25+ | `java -version` |
+| Godot | 4.6+ | `godot --version` |
+| Maven | 4.0+ | `./mvnw --version` 或 `mvn --version` |
 
-> **Java 25 是硬性要求**。godot-java 使用 Panama Foreign Function & Memory API（`java.lang.foreign`），这是 Java 25+ 才稳定可用的特性。
+Java 25 是硬性要求，因为 godot-java 使用 Panama Foreign Function & Memory API（`java.lang.foreign`）调用 Godot 原生 API。
 
-### 安装 JDK
+## 推荐方式：从模板项目开始
 
-**macOS：**
-```bash
-brew install openjdk@25 maven
-echo 'export JAVA_HOME=$(/usr/libexec/java_home -v 25)' >> ~/.zshrc
-source ~/.zshrc
-```
+应用开发者应该从 `godot-java-template` 开始，而不是直接使用 `godot-java` 框架源码仓库。
 
-**Linux（Ubuntu/Debian）：**
-```bash
-curl -s "https://get.sdkman.io" | bash
-source ~/.sdkman/bin/sdkman-init.sh
-sdk install java 25.0.2-tem
-sudo apt install maven
-```
+模板已经包含：
 
-**Windows：**
-1. 从 [Adoptium](https://adoptium.net/) 下载 JDK 25
-2. `choco install maven`
-
-验证安装：
-```bash
-java -version    # 应显示 25+
-./mvnw --version # 首次使用 Maven Wrapper，自动下载 Maven 4.0+
-# 或使用系统 Maven（需预装 4.0+）
-mvn -version
-```
-
-## 第一步：创建 Maven 项目
+- Maven 4 Java 项目
+- `godot/` 目录下的 Godot 项目
+- `godot/godot-java.gdextension`
+- 构建时生成 `target/app.jar`
+- 构建时自动把 `app.jar` 和匹配平台的原生库同步到 `godot/godot-java/`
 
 ```bash
-mvn archetype:generate \
-  -DgroupId=com.example \
-  -DartifactId=my-godot-game \
-  -DarchetypeArtifactId=maven-archetype-quickstart \
-  -DinteractiveMode=false
+git clone https://github.com/youngledo/godot-java-template.git my-godot-game
 cd my-godot-game
+./mvnw package
+godot --path godot
 ```
 
-也可以在 IntelliJ IDEA 中选择 **File -> New -> Project -> Maven Archetype** 创建。
+执行 `./mvnw package` 后，Godot 项目里会出现：
 
-## 第二步：添加依赖
+```text
+godot/
+  godot-java.gdextension
+  godot-java/
+    app.jar
+    libgodot-java.dylib    # macOS
+    libgodot-java.so       # Linux
+    libgodot-java.dll      # Windows
+    VERSION
+```
 
-### Maven
-
-> 在 [Maven Central](https://central.sonatype.com/artifact/io.github.youngledo/godot-java-core) 查看最新版本号
-
-编辑 `pom.xml`：
+Maven 属性 `godot-java.version` 同时控制 Java 和 native 发布物版本。`godot-java-core` 与 `godot-java-native` 必须保持同一版本：
 
 ```xml
 <properties>
+    <godot-java.version>0.1.2</godot-java.version>
     <maven.compiler.release>25</maven.compiler.release>
 </properties>
-
-<dependencies>
-    <dependency>
-        <groupId>io.github.youngledo</groupId>
-        <artifactId>godot-java-core</artifactId>
-        <version>VERSION</version> <!-- 替换为最新版本 -->
-    </dependency>
-</dependencies>
 ```
 
-### Gradle (Kotlin DSL)
+应用项目依赖的是 `godot-java-core`：
 
-```kotlin
-dependencies {
-    implementation("io.github.youngledo:godot-java-core:VERSION") // 替换为最新版本
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
+```xml
+<dependency>
+    <groupId>io.github.youngledo</groupId>
+    <artifactId>godot-java-core</artifactId>
+    <version>${godot-java.version}</version>
+</dependency>
 ```
 
-### Gradle (Groovy DSL)
+不要把 `io.github.youngledo:godot-java` 当作应用依赖使用。旧版本曾把这个
+根 POM 发布到 Maven Central；新的发布应只提供开发者实际使用的
+`godot-java-core` jar。
 
-```groovy
-dependencies {
-    implementation 'io.github.youngledo:godot-java-core:VERSION' // 替换为最新版本
-}
+当前发布的 native classifiers：
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
-```
+- `macos-universal`
+- `linux-x86_64`
+- `windows-x86_64`
 
-## 第三步：编写 Java 类
+## 编写 Java Godot 类
 
-创建 `src/main/java/com/example/HealthComponent.java`：
+在应用项目源码中创建或修改一个 Java 类：
 
 ```java
 package com.example;
 
-import org.godot.Godot;
 import org.godot.annotation.Export;
 import org.godot.annotation.GodotClass;
 import org.godot.annotation.GodotMethod;
@@ -127,9 +95,7 @@ public class HealthComponent extends Node {
     private int currentHealth;
 
     @Signal(name = "health_changed")
-    private void onHealthChanged(int newHealth) {
-        // 方法体不使用，仅声明信号签名
-    }
+    private void onHealthChanged(int newHealth) {}
 
     @Signal(name = "died")
     private void onDied() {}
@@ -142,17 +108,10 @@ public class HealthComponent extends Node {
     @GodotMethod
     public void takeDamage(int amount) {
         currentHealth -= amount;
-        emit("health_changed", currentHealth);
-
+        emitSignal("health_changed", currentHealth);
         if (currentHealth <= 0) {
-            emit("died");
+            emitSignal("died");
         }
-    }
-
-    @GodotMethod
-    public void heal(int amount) {
-        currentHealth = Math.min(currentHealth + amount, maxHealth);
-        emit("health_changed", currentHealth);
     }
 
     @GodotMethod
@@ -163,52 +122,70 @@ public class HealthComponent extends Node {
 ```
 
 要点：
-- `@GodotClass` 将类注册到 Godot ClassDB，`name` 为 Godot 中显示的类名
-- `@Export` 将字段暴露到 Godot 编辑器的属性检查器
-- `@Signal` 声明信号，方法签名定义参数类型
-- `@GodotMethod` 将方法暴露给 Godot 对象系统调用
-- 虚方法（`_ready`、`_process` 等）通过 `@Override` 实现
 
-## 第四步：编译
+- `@GodotClass` 将类注册到 Godot ClassDB。
+- `@Export` 将字段暴露到 Godot Inspector。
+- `@Signal` 声明 Godot 信号。
+- `@GodotMethod` 将 Java 方法暴露给 Godot 对象系统。
+- `_ready()` 等虚方法直接用 `@Override` 覆盖。
+
+重新构建并运行：
 
 ```bash
-mvn compile -Dcheckstyle.skip=true
+./mvnw package
+godot --path godot
 ```
 
-编译产物在 `target/classes/` 目录下。
+## 在 Godot 中使用 Java 节点
 
-## 第五步：配置 Godot 项目
+JVM 启动后，带注解的 Java 类会注册为 Godot 类。场景可以直接使用这个 Java 类型：
 
-### 5.1 打包 Java 应用 Jar
+```ini
+[gd_scene load_steps=1 format=3]
 
-Godot 会先加载原生 GDExtension，然后 godot-java 启动 JVM 并加载你的 Java 应用 jar。真实项目中，这个 jar 应该是 fat/shaded jar，包含你的游戏代码、`godot-java-core`、第三方依赖，以及注解处理器生成的注册表。
-
-标准运行目录为：
-
+[node name="HealthComponent" type="HealthComponent"]
 ```
+
+也可以从另一个 Java 节点中创建：
+
+```java
+HealthComponent health = new HealthComponent();
+addChild(health);
+health.takeDamage(30);
+```
+
+## 手动集成
+
+只有在接入已有项目或编写自己的模板时，才需要走手动集成路径。
+
+添加 Java 依赖：
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>io.github.youngledo</groupId>
+        <artifactId>godot-java-core</artifactId>
+        <version>0.1.2</version>
+    </dependency>
+</dependencies>
+```
+
+Maven Central 搜索结果中可能也会出现旧版本的
+`io.github.youngledo:godot-java`，但它是 `pom` artifact，不是运行时 jar。
+应用代码应该依赖 `godot-java-core`。
+
+你的构建需要生成 fat application jar，并填充 Godot 运行目录：
+
+```text
 your-godot-project/
-├── godot-java/
-│   ├── app.jar
-│   └── libgodot-java.dylib   # 当前平台对应的 .dylib / .so / .dll
+  godot-java.gdextension
+  godot-java/
+    app.jar
+    libgodot-java.dylib    # 或 .so / .dll
+    VERSION
 ```
 
-在应用项目中，这件事应该由项目自己的构建完成。`godot-java-template`
-的 Maven 构建会在 `mvn package` 时生成 `target/app.jar`，解析匹配的
-`godot-java-native` classifier artifact，并把两者写入 Godot 项目。
-
-仓库示例和框架发布验证仍然可以用源码仓库里的同步脚本生成该布局：
-
-```bash
-scripts/sync-godot-java.sh \
-  --project godot-java-examples/examples/it-test \
-  --app-jar godot-java-examples/target/godot-java-examples.jar
-```
-
-默认情况下，同步脚本会解析当前平台匹配的 `godot-java-native` Maven artifact。本地开发框架时，也可以传入 `--native-lib` 或 `--native-zip` 使用刚构建出来的原生库。使用模板的应用开发者不应该依赖源码仓库里的这个脚本。
-
-### 5.2 创建 .gdextension 文件
-
-在 Godot 项目根目录创建 `godot-java.gdextension`：
+Godot 项目根目录中的 `.gdextension` 文件：
 
 ```ini
 [configuration]
@@ -224,68 +201,39 @@ windows.debug = "res://godot-java/libgodot-java.dll"
 windows.release = "res://godot-java/libgodot-java.dll"
 ```
 
-### 5.3 部署目录结构
+native 库发布坐标为：
 
-```
-your-godot-project/
-├── godot-java.gdextension
-├── godot-java/
-│   ├── app.jar
-│   └── libgodot-java.dylib   # 或 .so / .dll
-└── scenes/
+```text
+io.github.youngledo:godot-java-native:0.1.2:zip:<classifier>
 ```
 
-`app.jar` 与原生库放在同一目录时，godot-java 会自动把该 jar 作为 classpath。`GODOT_JAVA_CLASSPATH` 仍可作为高级调试覆盖项使用。
+native artifact 版本必须与 `app.jar` 中的 `godot-java-core` 版本一致。
 
-### 5.4 在 Godot 编辑器中启用
+## 框架示例
 
-1. 打开 Godot，进入 **项目 -> 项目设置 -> GDExtensions**
-2. 点击 **添加** 并选择 `godot-java.gdextension` 文件
-3. 重启 Godot 编辑器
-
-## 第六步：在 Godot 场景中使用 Java 节点
-
-创建一个场景，直接使用已注册的 Java 类作为节点类型：
-
-```ini
-[gd_scene load_steps=1 format=3]
-
-[node name="HealthComponent" type="HealthComponent"]
-```
-
-把这个场景设置为 `project.godot` 的主场景，或者从另一个 Java 节点中实例化它：
-
-```java
-HealthComponent health = new HealthComponent();
-addChild(health);
-health.takeDamage(30);
-```
-
-按 **F5** 运行。Godot 会加载 GDExtension，godot-java 启动 JVM，然后由
-Godot 的 ClassDB 创建 Java 节点。
+本仓库里的 `godot-java-examples/` 用于框架开发、回归验证和学习单个 API。新游戏项目不建议以它作为起点，推荐使用 `godot-java-template`。
 
 ## 常见问题
 
 ### "JVM not found"
 
-确认 `JAVA_HOME` 指向 JDK 25+：
+确认 `JAVA_HOME` 指向 JDK 25：
 
 ```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 25)  # macOS
-export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64  # Linux
+export JAVA_HOME=/path/to/jdk-25
 ```
 
 ### "Class not found"
 
-- 执行 `mvn package` 构建应用 jar
-- 执行同步流程，确保 `godot-java/app.jar` 已更新
-- 确认类上标注了 `@GodotClass` 注解
+- 执行 `./mvnw package`
+- 确认 `godot/godot-java/app.jar` 已更新
+- 确认类上有 `@GodotClass` 注解
 
 ### 原生库加载失败
 
-- 检查 `.gdextension` 文件中的路径是否正确
-- 确认原生库文件存在于 `godot-java/` 运行目录中
-- 确认库文件架构与 Godot 匹配（x64/ARM64）
+- 检查 `.gdextension` 文件路径是否与运行目录一致
+- 确认原生库文件存在于 `godot-java/`
+- 确认 native classifier 与运行 Godot 的平台匹配
 
 ## 下一步
 

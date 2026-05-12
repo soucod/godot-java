@@ -9,53 +9,47 @@
 - **JDK 25+**（Project Panama FFI 所需）
 - **Godot 4.6+**
 - **Maven 4.0+**
-- godot-java-core 已安装到本地 Maven 仓库
 
 ## 配置
 
-### 1. 构建原生桥接库
+这些示例位于框架源码仓库中。新游戏项目建议从 `godot-java-template`
+开始；模板会在 `mvn package` 时打包 Java 应用并同步 native runtime。
 
-原生库是 Godot 启动 JVM 的入口，必须先构建：
-
-```bash
-# macOS（需要 Xcode 命令行工具）
-cd godot-java-core/native && ./build-macos.sh
-
-# Linux（需要 clang++）
-cd godot-java-core/native && ./build-linux.sh
-```
-
-```cmd
-REM Windows（需要 MSVC 或 MinGW）
-cd godot-java-core\native && build-windows.bat
-```
-
-编译 `godot_java.cpp`，产物位于 `godot-java-core/native/build/`。
-
-### 2. 构建 fat jar
+### 1. 构建示例 jar
 
 ```bash
-cd godot-java-examples
-mvn package
+./mvnw package -pl godot-java-examples -am -DskipTests
 ```
 
 生成 fat JAR：`target/godot-java-examples.jar`。
 
-### 3. 同步运行时文件到示例项目
+### 2. 同步运行时文件到示例项目
 
 标准项目本地运行目录为 `godot-java/`，里面放 `app.jar` 和原生 GDExtension 库：
 
+如果你在试用已发布 tag，可以同步同版本的已发布 native artifact：
+
 ```bash
-cd ..
+./scripts/sync-godot-java.sh \
+  --project godot-java-examples/examples/it-test \
+  --app-jar godot-java-examples/target/godot-java-examples.jar \
+  --version 0.1.2
+```
+
+如果你在 `main` 上开发框架源码，应先从源码构建 native 库，并显式传入，
+避免 Java 与 native runtime 版本不一致：
+
+```bash
+./godot-java-core/native/build-macos.sh
 ./scripts/sync-godot-java.sh \
   --project godot-java-examples/examples/it-test \
   --app-jar godot-java-examples/target/godot-java-examples.jar \
   --native-lib godot-java-core/native/build/libgodot-java.dylib
 ```
 
-Linux 或 Windows 请替换为对应平台的原生库文件名。使用已发布版本时，可以省略 `--native-lib`，同步脚本会解析匹配的 `godot-java-native` Maven artifact。
+Linux 或 Windows 请使用 `build-linux.sh` / `build-windows.bat` 和对应库文件。
 
-### 4. 在 Godot 中打开示例
+### 3. 在 Godot 中打开示例
 
 用 Godot 打开 `examples/` 下的任意示例目录：
 
@@ -92,7 +86,7 @@ open -a Godot.app ./examples/01-hello-world
 
 ## 工作原理
 
-每个示例遵循相同的模式：
+较早的功能示例遵循相同的模式：
 
 1. **Java 类** — 使用 `@GodotClass` 注解，继承 Godot 节点类型（如 `Node`、`Node2D`、`CharacterBody2D`）
 2. **GDScript** — 通过 `ClassDB.instantiate("ClassName")` 创建 Java 对象并加入场景树
@@ -155,7 +149,8 @@ godot-java-examples/
     └── ...
 ```
 
-`it-test` 项目已经使用标准 `godot-java/` 运行布局。其它功能示例仍保留原有 `native/` 布局，后续会逐步迁移。
+`it-test` 项目已经使用标准 `godot-java/` 运行布局。其它功能示例仍保留原有
+`native/` 布局，后续会逐步迁移。
 
 ## 许可证
 

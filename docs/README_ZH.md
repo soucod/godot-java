@@ -8,7 +8,7 @@
 
 > 使用 Java 25+ 和 Panama FFI 编写 Godot 4.6 游戏逻辑
 
-- [快速入门](zh/user/getting-started.md) -- 环境准备、Maven 配置、第一个类
+- [快速入门](zh/user/getting-started.md) -- 模板项目、Maven 配置、第一个 Java 类
 - [API 参考](zh/user/api.md) -- 注解、类型、核心类
 - [开发指南](zh/user/guide.md) -- 逐步构建游戏实体、虚方法、信号
 - [常见问题](zh/user/troubleshooting.md) -- 常见错误及解决方案

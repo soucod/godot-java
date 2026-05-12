@@ -9,53 +9,49 @@ Progressive tutorial examples for [godot-java](https://github.com/youngledo/godo
 - **JDK 25+** (required for Project Panama FFI)
 - **Godot 4.6+**
 - **Maven 4.0+**
-- godot-java-core installed in local Maven repository
 
 ## Setup
 
-### 1. Build the native bridge library
+These examples live in the framework repository. For a new game project, start
+from `godot-java-template`; it packages the Java app and syncs the native
+runtime during `mvn package`.
 
-The native library is required for Godot to start the JVM. Build it for your platform:
-
-```shell
-# macOS (requires Xcode command line tools)
-cd godot-java-core/native && ./build-macos.sh
-
-# Linux (requires clang++)
-cd godot-java-core/native && ./build-linux.sh
-```
-
-```cmd
-REM Windows (requires MSVC or MinGW)
-cd godot-java-core\native && build-windows.bat
-```
-
-This compiles `godot_java.cpp` into `godot-java-core/native/build/`.
-
-### 2. Build the fat jar
+### 1. Build the examples jar
 
 ```shell
-cd godot-java-examples
-mvn package
+./mvnw package -pl godot-java-examples -am -DskipTests
 ```
 
 This produces the fat JAR at `target/godot-java-examples.jar`.
 
-### 3. Sync runtime files into an example
+### 2. Sync runtime files into an example
 
 The canonical project-local runtime directory is `godot-java/`, containing `app.jar` and the native GDExtension library:
 
+If you are trying a released tag, sync the matching released native artifact:
+
 ```shell
-cd ..
+./scripts/sync-godot-java.sh \
+  --project godot-java-examples/examples/it-test \
+  --app-jar godot-java-examples/target/godot-java-examples.jar \
+  --version 0.1.2
+```
+
+If you are working on `main`, build the native library from source and pass it
+explicitly so the Java and native runtime versions stay aligned:
+
+```shell
+./godot-java-core/native/build-macos.sh
 ./scripts/sync-godot-java.sh \
   --project godot-java-examples/examples/it-test \
   --app-jar godot-java-examples/target/godot-java-examples.jar \
   --native-lib godot-java-core/native/build/libgodot-java.dylib
 ```
 
-Use the platform native library name for Linux or Windows. When consuming released artifacts, omit `--native-lib`; the sync helper resolves the matching `godot-java-native` Maven artifact.
+Use `build-linux.sh` / `build-windows.bat` and the matching library file on
+Linux or Windows.
 
-### 4. Open an example in Godot
+### 3. Open an example in Godot
 
 Open any example directory under `examples/` as a Godot project:
 
@@ -92,7 +88,7 @@ Or run in headless mode:
 
 ## How It Works
 
-Each example follows the same pattern:
+The older feature examples follow the same pattern:
 
 1. **Java class** — annotated with `@GodotClass`, extends a Godot node type (e.g., `Node`, `Node2D`, `CharacterBody2D`)
 2. **GDScript** — creates the Java object via `ClassDB.instantiate("ClassName")` and adds it to the scene tree
@@ -155,7 +151,9 @@ godot-java-examples/
     └── ...
 ```
 
-The `it-test` project uses the canonical `godot-java/` runtime layout. The older feature examples still use their existing `native/` layout until they are migrated.
+The `it-test` project uses the canonical `godot-java/` runtime layout. The older
+feature examples still use their existing `native/` layout until they are
+migrated.
 
 ## License
 

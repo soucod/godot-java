@@ -9,9 +9,10 @@ ENGLISH | [中文](README_ZH.md)
 Java bindings for [Godot](https://godotengine.org/).  
 Built on top of GDExtension and Panama FFI to make Java a first-class citizen in the Godot ecosystem.
 
-> Status: 0.1.0 – production-ready with scoped memory management and full GDExtension feature coverage.
+> Status: 0.1.2 – production-ready with scoped memory management, full GDExtension feature coverage, and Maven Central desktop runtime artifacts.
 
 Project examples:
+- [godot-java-template](https://github.com/youngledo/godot-java-template) — recommended starting point for new desktop projects
 - [godot-java-examples](godot-java-examples/README.md) — 10 small examples in this repo
 - [godot-java-demo-projects](https://github.com/youngledo/godot-java-demo-projects) — 107 official Godot demos ported to Java (2D, 3D, audio, GUI, networking, XR, and more)
 - [godot-java-3d-demo](https://github.com/youngledo/godot-java-3d-demo) — a 3D character demo
@@ -313,20 +314,21 @@ Then verify:
 
 ## Where to start?
 
-To get a demo running:
+To start a new Godot Java project, use the standalone template:
 
-1. Make sure you have:
-   - JDK 25+
-   - Maven 4.0.x
-   - Godot
+```bash
+git clone https://github.com/youngledo/godot-java-template.git my-godot-game
+cd my-godot-game
+./mvnw package
+godot --path godot
+```
 
-2. Read:
-   - [docs/en/user/getting-started.md](docs/en/user/getting-started.md)
+The template consumes released Maven artifacts and syncs `app.jar` plus the
+matching native desktop library into the Godot project during `mvn package`.
 
-3. Then:
-   - Build `godot-java-core` and `godot-java-code-generator`
-   - Load the built GDExtension into a new Godot project
-   - Create a simple `@GodotClass`-annotated Java script and experiment
+Then read [docs/en/user/getting-started.md](docs/en/user/getting-started.md).
+Use this repository directly only when contributing to the framework or running
+the internal examples.
 
 ---
 

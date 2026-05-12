@@ -1,123 +1,81 @@
 # Getting Started
 
-Set up godot-java in 5 minutes.
+Set up a Godot desktop project that runs Java game code with `godot-java`.
 
 ## Prerequisites
 
 | Tool | Minimum Version | Verification |
-|---|-----------------|---|
-| JDK | 25+             | `java -version` |
-| Godot | 4.6+            | `godot --version` |
-| Maven | 4.0.x (Wrapper included) | `mvn -version` or `./mvnw --version` |
+|---|---:|---|
+| JDK | 25+ | `java -version` |
+| Godot | 4.6+ | `godot --version` |
+| Maven | 4.0+ | `./mvnw --version` or `mvn --version` |
 
-Java 25 is required because godot-java uses the Panama Foreign Function & Memory API (`java.lang.foreign`) for all native calls to the Godot C API.
+Java 25 is required because godot-java uses the Panama Foreign Function & Memory API (`java.lang.foreign`) for native calls into Godot.
 
-### Install JDK 25
+## Recommended Path: Start from the Template
 
-**macOS:**
-```bash
-brew install openjdk@25 maven
-echo 'export JAVA_HOME=$(/usr/libexec/java_home -v 25)' >> ~/.zshrc
-source ~/.zshrc
-```
+Application developers should start from `godot-java-template` instead of cloning the `godot-java` framework repository.
 
-**Linux (Ubuntu/Debian):**
-```bash
-curl -s "https://get.sdkman.io" | bash
-source ~/.sdkman/bin/sdkman-init.sh
-sdk install java 25.0.0-tem
-sudo apt install maven
-```
+The template already contains:
 
-**Windows:**
-1. Download JDK 25 from [Adoptium](https://adoptium.net/)
-2. Install Maven: `choco install maven`
-
-Verify:
-```bash
-java -version    # must show 25+
-./mvnw --version # First-time: auto-downloads Maven 4.0+
-# or use system Maven (requires 4.0+ pre-installed)
-mvn -version
-```
-
-## Step 1: Create a Maven Project
-
-### Option A: IntelliJ IDEA (recommended)
-
-1. **File > New > Project**, select **Maven Archetype**
-2. Set Group ID: `com.example`, Artifact ID: `my-godot-game`
-3. Select JDK 25+
-4. Click **Create**
-
-### Option B: Command Line
+- a Maven 4 Java project
+- a Godot project under `godot/`
+- `godot/godot-java.gdextension`
+- a Maven build that creates `target/app.jar`
+- automatic sync of `app.jar` and the matching native library into `godot/godot-java/`
 
 ```bash
-mvn archetype:generate \
-  -DgroupId=com.example \
-  -DartifactId=my-godot-game \
-  -DarchetypeArtifactId=maven-archetype-quickstart \
-  -DinteractiveMode=false
+git clone https://github.com/youngledo/godot-java-template.git my-godot-game
 cd my-godot-game
+./mvnw package
+godot --path godot
 ```
 
-## Step 2: Add the Dependency
+After `./mvnw package`, the Godot project contains:
 
-### Maven
-
-> Check the latest version on [Maven Central](https://central.sonatype.com/artifact/io.github.youngledo/godot-java-core)
-
-Edit `pom.xml` and add godot-java-core inside `<dependencies>`:
-
-```xml
-<dependencies>
-    <dependency>
-        <groupId>io.github.youngledo</groupId>
-        <artifactId>godot-java-core</artifactId>
-        <version>VERSION</version> <!-- replace with latest -->
-    </dependency>
-</dependencies>
+```text
+godot/
+  godot-java.gdextension
+  godot-java/
+    app.jar
+    libgodot-java.dylib    # macOS
+    libgodot-java.so       # Linux
+    libgodot-java.dll      # Windows
+    VERSION
 ```
 
-Set the Java 25 compiler target:
+The Maven property `godot-java.version` controls both Java and native artifacts. Keep `godot-java-core` and `godot-java-native` on the same version:
 
 ```xml
 <properties>
+    <godot-java.version>0.1.2</godot-java.version>
     <maven.compiler.release>25</maven.compiler.release>
 </properties>
 ```
 
-### Gradle (Kotlin DSL)
+Use `godot-java-core` in application dependencies:
 
-```kotlin
-dependencies {
-    implementation("io.github.youngledo:godot-java-core:VERSION") // replace with latest
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
+```xml
+<dependency>
+    <groupId>io.github.youngledo</groupId>
+    <artifactId>godot-java-core</artifactId>
+    <version>${godot-java.version}</version>
+</dependency>
 ```
 
-### Gradle (Groovy DSL)
+Do not use `io.github.youngledo:godot-java` as an application dependency. Older
+releases exposed that root POM on Maven Central, but new releases publish the
+developer-facing `godot-java-core` jar instead.
 
-```groovy
-dependencies {
-    implementation 'io.github.youngledo:godot-java-core:VERSION' // replace with latest
-}
+Supported native classifiers:
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
-```
+- `macos-universal`
+- `linux-x86_64`
+- `windows-x86_64`
 
-## Step 3: Write Your First Godot Class
+## Write a Java Godot Class
 
-Create `src/main/java/com/example/HealthComponent.java`:
+Create or edit a Java class in the application source tree:
 
 ```java
 package com.example;
@@ -165,54 +123,69 @@ public class HealthComponent extends Node {
 
 Key points:
 
-- `@GodotClass` registers the class with Godot's ClassDB (auto-discovered at startup).
-- `@Export` exposes a field to the Godot editor Inspector panel.
-- `@Signal` declares a signal; the method body is unused, only the signature matters.
-- `@GodotMethod` makes a method callable through Godot's object system.
+- `@GodotClass` registers the class with Godot's ClassDB.
+- `@Export` exposes a field to the Godot Inspector.
+- `@Signal` declares a Godot signal.
+- `@GodotMethod` exposes a Java method through Godot's object system.
 - Virtual methods like `_ready()` are overridden normally with `@Override`.
 
-## Step 4: Compile
+Rebuild and run:
 
 ```bash
-mvn compile
+./mvnw package
+godot --path godot
 ```
 
-On success, class files appear in `target/classes/`.
+## Use Java Nodes in Godot
 
-## Step 5: Deploy to Your Godot Project
+Once the JVM starts, annotated Java classes are registered as Godot classes. A scene can use the Java class directly:
 
-### 5.1 Package Your Java App Jar
+```ini
+[gd_scene load_steps=1 format=3]
 
-Godot loads the native GDExtension first, then godot-java starts a JVM and loads your Java application jar. In a real project this should be a fat/shaded jar that contains your game classes, `godot-java-core`, third-party dependencies, and the annotation-processor generated registry.
-
-The standard runtime directory is:
-
+[node name="HealthComponent" type="HealthComponent"]
 ```
+
+You can also create Java nodes from another Java node:
+
+```java
+HealthComponent health = new HealthComponent();
+addChild(health);
+health.takeDamage(30);
+```
+
+## Manual Integration
+
+Use this path only if you are integrating godot-java into an existing project or writing your own template.
+
+Add the Java dependency:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>io.github.youngledo</groupId>
+        <artifactId>godot-java-core</artifactId>
+        <version>0.1.2</version>
+    </dependency>
+</dependencies>
+```
+
+`io.github.youngledo:godot-java` may appear in Maven Central search results for
+older releases, but it is a `pom` artifact rather than the runtime jar.
+Application code should depend on `godot-java-core`.
+
+Your build must produce a fat application jar and populate the Godot runtime directory:
+
+```text
 your-godot-project/
+  godot-java.gdextension
   godot-java/
     app.jar
-    libgodot-java.dylib    # or .so / .dll for the current platform
+    libgodot-java.dylib    # or .so / .dll
+    VERSION
 ```
 
-In an application project, this should be part of the project build. The
-`godot-java-template` Maven build runs this during `mvn package`: it creates
-`target/app.jar`, resolves the matching `godot-java-native` classifier artifact,
-and writes both files into the Godot project.
-
-For repository examples and framework release verification, the source
-repository also includes a sync helper:
-
-```bash
-scripts/sync-godot-java.sh \
-  --project godot-java-examples/examples/it-test \
-  --app-jar godot-java-examples/target/godot-java-examples.jar
-```
-
-By default, the helper resolves the matching `godot-java-native` Maven artifact for the current platform. During local framework development, pass `--native-lib` or `--native-zip` to use a freshly built native library. Application developers should not need the source repository helper when using the template.
-
-### 5.2 Create the .gdextension File
-
-Create `godot-java.gdextension` in your Godot project root:
+Use this `.gdextension` file in the Godot project root:
 
 ```ini
 [configuration]
@@ -228,66 +201,39 @@ windows.debug = "res://godot-java/libgodot-java.dll"
 windows.release = "res://godot-java/libgodot-java.dll"
 ```
 
-### 5.3 Final Directory Layout
+The native library is distributed as:
 
-```
-your-godot-project/
-  godot-java.gdextension
-  godot-java/
-    app.jar
-    libgodot-java.dylib    # or .so / .dll
-  scenes/
+```text
+io.github.youngledo:godot-java-native:0.1.2:zip:<classifier>
 ```
 
-### 5.4 Enable in Godot
+The native artifact version must match the `godot-java-core` version inside `app.jar`.
 
-1. Open your Godot project.
-2. Go to **Project > Project Settings > GDExtensions**.
-3. Click **Add** and select the `godot-java.gdextension` file.
-4. Restart the Godot editor.
+## Framework Examples
 
-## Step 6: Use Java Nodes in a Godot Scene
-
-Create a scene that uses the registered Java class as a node type:
-
-```ini
-[gd_scene load_steps=1 format=3]
-
-[node name="HealthComponent" type="HealthComponent"]
-```
-
-Set this scene as the main scene in `project.godot`, or instantiate the Java
-class from another Java node:
-
-```java
-HealthComponent health = new HealthComponent();
-addChild(health);
-health.takeDamage(30);
-```
-
-Press **F5** to run. Godot loads the GDExtension, godot-java starts the JVM,
-and the Java node is created by Godot's ClassDB.
+This repository also contains `godot-java-examples/`. Those examples are for framework development, regression checks, and learning individual APIs. They are not the recommended starting point for a new game project.
 
 ## Common Issues
 
 ### "JVM not found"
 
 Set `JAVA_HOME` to your JDK 25 installation:
+
 ```bash
 export JAVA_HOME=/path/to/jdk-25
 ```
 
 ### "Class not found"
 
-- Run `mvn package` to build the application jar.
-- Run the sync workflow so `godot-java/app.jar` is updated.
+- Run `./mvnw package`.
+- Confirm `godot/godot-java/app.jar` was updated.
 - Verify the class is annotated with `@GodotClass`.
 
-### Native library load failure
+### Native Library Load Failure
 
-- Verify the `.gdextension` file paths match the actual file locations.
-- Confirm the native library exists in the `godot-java/` runtime directory.
-- Confirm the library architecture matches your Godot editor (x64 vs ARM64).
+- Verify `.gdextension` paths match the runtime directory.
+- Confirm the native library exists in `godot-java/`.
+- Confirm the native classifier matches the platform running Godot.
 
 ## Next Steps
 

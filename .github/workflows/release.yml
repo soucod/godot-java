@@ -182,23 +182,36 @@ jobs:
                   text = re.sub(r"(<project\b[^>]*>\s*)", r"\1    <modelVersion>4.0.0</modelVersion>\n", text, count=1, flags=re.S)
               return text
 
+          def maven_property(name):
+              return "${" + name + "}"
+
           junit_version = property_value("junit.version")
           log4j2_version = property_value("log4j2.version")
+          exec_maven_plugin_version = property_value("exec-maven-plugin.version")
+          spotbugs_maven_plugin_version = property_value("spotbugs-maven-plugin.version")
+          maven_compiler_plugin_version = property_value("maven-compiler-plugin.version")
+          maven_compiler_release = property_value("maven.compiler.release")
+          maven_jar_plugin_version = property_value("maven-jar-plugin.version")
+          maven_source_plugin_version = property_value("maven-source-plugin.version")
+          maven_javadoc_plugin_version = property_value("maven-javadoc-plugin.version")
+          maven_surefire_plugin_version = property_value("maven-surefire-plugin.version")
+          maven_gpg_plugin_version = property_value("maven-gpg-plugin.version")
+          maven_assembly_plugin_version = "3.7.1"
 
           root_text = central_compatible_pom(root_text)
           root_text = root_text.replace("<version>${revision}</version>", f"<version>{revision}</version>", 1)
           root_text = re.sub(r"<revision>[^<]+</revision>", f"<revision>{revision}</revision>", root_text, count=1)
-          root_modules = """    <modules>\n        <module>godot-java-code-generator</module>\n        <module>godot-java-core</module>\n        <module>godot-java-examples</module>\n        <module>godot-java-native</module>\n    </modules>\n\n"""
+          root_modules = """    <modules>\n        <module>godot-java-code-generator</module>\n        <module>godot-java-core</module>\n        <module>godot-java-native</module>\n    </modules>\n\n"""
           if "<modules>" not in root_text:
               root_text = root_text.replace("    <licenses>", root_modules + "    <licenses>", 1)
+          central_plugin = """            <plugin>\n                <groupId>org.sonatype.central</groupId>\n                <artifactId>central-publishing-maven-plugin</artifactId>\n                <version>0.10.0</version>\n                <extensions>true</extensions>\n                <configuration>\n                    <publishingServerId>central</publishingServerId>\n                    <autoPublish>true</autoPublish>\n                    <excludeArtifacts>\n                        <excludeArtifact>godot-java</excludeArtifact>\n                        <excludeArtifact>godot-java-code-generator</excludeArtifact>\n                        <excludeArtifact>godot-java-examples</excludeArtifact>\n                    </excludeArtifacts>\n                </configuration>\n            </plugin>\n"""
+          if "<artifactId>central-publishing-maven-plugin</artifactId>" not in root_text.split("    <profiles>", 1)[0]:
+              root_text = root_text.replace("        </plugins>", central_plugin + "        </plugins>", 1)
           root.write_text(root_text)
 
           parent_with_coordinates = f"""    <parent>\n        <groupId>io.github.youngledo</groupId>\n        <artifactId>godot-java</artifactId>\n        <version>{revision}</version>\n    </parent>"""
           for path in [
               Path("godot-java-code-generator/pom.xml"),
-              Path("godot-java-core/pom.xml"),
-              Path("godot-java-examples/pom.xml"),
-              Path("godot-java-native/pom.xml"),
           ]:
               text = central_compatible_pom(path.read_text())
               if "<parent/>" not in text:
@@ -206,9 +219,12 @@ jobs:
               path.write_text(re.sub(r"\s*<parent/>\s*", "\n" + parent_with_coordinates + "\n\n", text, count=1))
 
           core = Path("godot-java-core/pom.xml")
-          core_text = core.read_text()
+          core_text = central_compatible_pom(core.read_text())
+          if "<parent/>" not in core_text:
+              raise RuntimeError("Unexpected parent block in godot-java-core/pom.xml")
+          core_text = re.sub(r"\s*<parent/>\s*", "\n", core_text, count=1)
           core_coordinates = f"""    <groupId>io.github.youngledo</groupId>\n    <version>{revision}</version>\n"""
-          core_text = core_text.replace("    <artifactId>godot-java-core</artifactId>", core_coordinates + "    <artifactId>godot-java-core</artifactId>", 1)
+          core_text = re.sub(r"(\s*)<artifactId>godot-java-core</artifactId>", "\n" + core_coordinates + r"\1<artifactId>godot-java-core</artifactId>", core_text, count=1)
           core_metadata = """
 
               <url>https://github.com/youngledo/godot-java</url>
@@ -237,19 +253,65 @@ jobs:
           core_text = core_text.replace("""            <artifactId>junit-jupiter</artifactId>""", f"""            <artifactId>junit-jupiter</artifactId>\n            <version>{junit_version}</version>\n            <scope>test</scope>""", 1)
           core_text = core_text.replace("""            <artifactId>log4j-api</artifactId>""", f"""            <artifactId>log4j-api</artifactId>\n            <version>{log4j2_version}</version>""", 1)
           core_text = core_text.replace("""            <artifactId>log4j-core</artifactId>""", f"""            <artifactId>log4j-core</artifactId>\n            <version>{log4j2_version}</version>\n            <scope>runtime</scope>""", 1)
+          core_text = core_text.replace("${exec-maven-plugin.version}", exec_maven_plugin_version)
+          core_text = core_text.replace("${spotbugs-maven-plugin.version}", spotbugs_maven_plugin_version)
+          core_text = core_text.replace("        <plugins>", f"""        <plugins>\n            <plugin>\n                <groupId>org.apache.maven.plugins</groupId>\n                <artifactId>maven-compiler-plugin</artifactId>\n                <version>{maven_compiler_plugin_version}</version>\n                <configuration>\n                    <release>{maven_compiler_release}</release>\n                </configuration>\n            </plugin>\n""", 1)
+          for artifact_id, version in [
+              ("maven-jar-plugin", maven_jar_plugin_version),
+              ("maven-surefire-plugin", maven_surefire_plugin_version),
+              ("maven-source-plugin", maven_source_plugin_version),
+              ("maven-javadoc-plugin", maven_javadoc_plugin_version),
+          ]:
+              marker = f"            <artifactId>{artifact_id}</artifactId>"
+              replacement = marker + f"\n            <version>{version}</version>"
+              if marker in core_text and replacement not in core_text:
+                  core_text = core_text.replace(marker, replacement, 1)
+          core_text = core_text.replace("        </plugins>", f"""            <plugin>\n                <groupId>org.apache.maven.plugins</groupId>\n                <artifactId>maven-gpg-plugin</artifactId>\n                <version>{maven_gpg_plugin_version}</version>\n                <configuration>\n                    <skip>{maven_property("gpg.skip")}</skip>\n                    <passphrase>{maven_property("env.GPG_PASSPHRASE")}</passphrase>\n                    <gpgArguments>\n                        <arg>--pinentry-mode</arg>\n                        <arg>loopback</arg>\n                    </gpgArguments>\n                </configuration>\n                <executions>\n                    <execution>\n                        <id>sign-artifacts</id>\n                        <phase>verify</phase>\n                        <goals>\n                            <goal>sign</goal>\n                        </goals>\n                    </execution>\n                </executions>\n            </plugin>\n        </plugins>""", 1)
           core.write_text(core_text)
 
-          examples = Path("godot-java-examples/pom.xml")
-          examples_text = examples.read_text()
-          examples_text = examples_text.replace("""            <artifactId>godot-java-core</artifactId>""", f"""            <artifactId>godot-java-core</artifactId>\n            <version>{revision}</version>""", 1)
-          examples.write_text(examples_text)
+          native = Path("godot-java-native/pom.xml")
+          native_text = central_compatible_pom(native.read_text())
+          if "<parent/>" not in native_text:
+              raise RuntimeError("Unexpected parent block in godot-java-native/pom.xml")
+          native_text = re.sub(r"\s*<parent/>\s*", "\n", native_text, count=1)
+          native_coordinates = f"""    <groupId>io.github.youngledo</groupId>\n    <version>{revision}</version>\n"""
+          native_text = re.sub(r"(\s*)<artifactId>godot-java-native</artifactId>", "\n" + native_coordinates + r"\1<artifactId>godot-java-native</artifactId>", native_text, count=1)
+          native_text = native_text.replace("    <packaging>pom</packaging>", "    <packaging>jar</packaging>", 1)
+          native_metadata = """
+
+              <url>https://github.com/youngledo/godot-java</url>
+
+              <licenses>
+                  <license>
+                      <name>Apache-2.0</name>
+                      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+                      <distribution>repo</distribution>
+                  </license>
+              </licenses>
+
+              <developers>
+                  <developer>
+                      <id>youngledo</id>
+                  </developer>
+              </developers>
+
+              <scm>
+                  <connection>scm:git:git@github.com:youngledo/godot-java.git</connection>
+                  <developerConnection>scm:git:git@github.com:youngledo/godot-java.git</developerConnection>
+                  <url>https://github.com/youngledo/godot-java</url>
+              </scm>"""
+          native_text = native_text.replace("    <description>Platform native GDExtension library for godot-java</description>", "    <description>Platform native GDExtension library for godot-java</description>" + native_metadata, 1)
+          native_text = native_text.replace("""                <artifactId>maven-assembly-plugin</artifactId>""", f"""                <artifactId>maven-assembly-plugin</artifactId>\n                <version>{maven_assembly_plugin_version}</version>""", 1)
+          native_text = native_text.replace("        </plugins>", f"""            <plugin>\n                <groupId>org.apache.maven.plugins</groupId>\n                <artifactId>maven-gpg-plugin</artifactId>\n                <version>{maven_gpg_plugin_version}</version>\n                <configuration>\n                    <skip>{maven_property("gpg.skip")}</skip>\n                    <passphrase>{maven_property("env.GPG_PASSPHRASE")}</passphrase>\n                    <gpgArguments>\n                        <arg>--pinentry-mode</arg>\n                        <arg>loopback</arg>\n                    </gpgArguments>\n                </configuration>\n                <executions>\n                    <execution>\n                        <id>sign-artifacts</id>\n                        <phase>verify</phase>\n                        <goals>\n                            <goal>sign</goal>\n                        </goals>\n                    </execution>\n                </executions>\n            </plugin>\n        </plugins>""", 1)
+          native.write_text(native_text)
+
           PY
 
       - name: Build and publish
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
-        run: ./mvnw deploy -P release -Drevision="$REVISION" -Dgodot.java.native.attach.dir="$PWD/dist/native" -DskipTests -B
+        run: ./mvnw install org.sonatype.central:central-publishing-maven-plugin:0.10.0:publish -pl godot-java-core,godot-java-native -am -P release -Drevision="$REVISION" -Dgodot.java.native.attach.dir="$PWD/dist/native" -DautoPublish=true -Dmaven.consumer.pom.flatten=false -DskipTests -Dspotbugs.skip=true -Dspotless.skip=true -B
 
       - name: Attach native fallback artifacts to GitHub Release
         uses: softprops/action-gh-release@v2

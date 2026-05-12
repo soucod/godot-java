@@ -29,11 +29,14 @@ Java projects depend on:
 </dependency>
 ```
 
+`io.github.youngledo:godot-java` is a root POM used inside the source tree.
+Application projects should not use it as their runtime dependency, and new
+Central releases should not publish it.
+
 Native desktop libraries are published through `io.github.youngledo:godot-java-native` with platform classifiers:
 
 - `macos-universal`
 - `linux-x86_64`
-- `linux-aarch64`
 - `windows-x86_64`
 
 The native artifact version must match the `godot-java-core` version embedded in the application jar.

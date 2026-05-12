@@ -6,9 +6,16 @@ extends Node
 var tests_passed := 0
 var tests_failed := 0
 var test_node: Object
+var stress_iterations := 50
 
 func _ready():
+	call_deferred("run_tests")
+
+func run_tests():
 	print("TEST_RUNNER: starting tests...")
+	if OS.get_environment("GODOT_JAVA_STABILITY_LONG") == "true":
+		stress_iterations = 1000
+	print("TEST_RUNNER: stability stress iterations=%d" % stress_iterations)
 
 	# Create the Java test node
 	test_node = ClassDB.instantiate("IntegrationTestNode")
@@ -20,6 +27,7 @@ func _ready():
 
 	add_child(test_node)
 	print("TEST_RUNNER: IntegrationTestNode created and added to scene")
+	print("TEST_DIAGNOSTIC: %s" % test_node.captureMemoryStats("startup"))
 
 	# Run all tests immediately (_ready already fired on the Java node)
 	test_virtual_ready()
@@ -30,6 +38,15 @@ func _ready():
 	test_process_virtual()
 	test_control_minimum_size()
 	test_notification()
+	test_lifecycle_order()
+	test_dispatch_matrix()
+	test_java_to_godot_calls()
+	test_ref_counted_lifecycle()
+	test_generated_registry()
+	test_scoped_memory_diagnostics()
+	test_short_stress()
+	await test_java_object_mapping_cleanup()
+	print("TEST_DIAGNOSTIC: %s" % test_node.captureMemoryStats("teardown"))
 
 	# Summary
 	var total := tests_passed + tests_failed
@@ -123,3 +140,53 @@ func test_notification():
 	var last_notif: int = test_node.getLastNotification()
 	# At minimum, NOTIFICATION_READY (13) or NOTIFICATION_ENTER_TREE (10) should have fired
 	assert_true(last_notif > 0, "onNotification received a valid notification (last=%d)" % last_notif)
+
+func test_lifecycle_order():
+	var events: String = test_node.getLifecycleEvents()
+	assert_true(events.contains("enter_tree"), "_enterTree() virtual was called")
+	assert_true(events.contains("ready"), "_ready() lifecycle event was recorded")
+	assert_true(events.find("enter_tree") <= events.find("ready"), "enter_tree occurs before ready (%s)" % events)
+
+func test_dispatch_matrix():
+	var primitive_result: String = test_node.primitiveDispatchMatrix(7, 8, 1.5, 2.5, true, "ok")
+	assert_eq(primitive_result, "7:8:15:25:true:ok", "primitive dispatch matrix round-trip")
+
+	var length_squared: float = test_node.vector2LengthSquared(Vector2(3, 4))
+	assert_eq(length_squared, 25.0, "Vector2 dispatch round-trip")
+
+func test_java_to_godot_calls():
+	var result: bool = test_node.testJavaToGodotNodeChurn(10)
+	assert_true(result, "Java-to-Godot generated Node wrapper calls survive churn")
+
+func test_ref_counted_lifecycle():
+	var before: int = test_node.getTrackedRefCountedCount()
+	var result: bool = test_node.testRefCountedLifecycle()
+	var after: int = test_node.getTrackedRefCountedCount()
+	assert_true(result, "RefCounted helper reference/unreference lifecycle")
+	assert_eq(after, before, "RefCounted tracked count returns to baseline")
+
+func test_generated_registry():
+	assert_true(test_node.generatedRegistryAvailable(), "generated class registry is present")
+
+func test_scoped_memory_diagnostics():
+	var stats: String = test_node.runScopedMemoryDiagnostics(25)
+	print("TEST_DIAGNOSTIC: %s" % stats)
+	assert_true(stats.contains("scoped-memory-diagnostics"), "scoped native memory diagnostics recorded")
+
+func test_short_stress():
+	assert_true(test_node.testShortStress(stress_iterations), "stability stress run completed")
+
+func test_java_object_mapping_cleanup():
+	var child = ClassDB.instantiate("IntegrationTestNode")
+	if child == null:
+		assert_true(false, "Java object mapping cleanup child can be instantiated")
+		return
+
+	add_child(child)
+	await get_tree().process_frame
+	var before: int = test_node.getJavaObjectMapSize()
+	child.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var after: int = test_node.getJavaObjectMapSize()
+	assert_true(after < before, "JavaObjectMap shrinks after Java-backed node queue_free (before=%d after=%d)" % [before, after])

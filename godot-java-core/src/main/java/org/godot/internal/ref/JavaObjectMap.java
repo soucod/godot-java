@@ -59,6 +59,10 @@ public final class JavaObjectMap {
 		return NATIVE_TO_JAVA.containsKey(nativePtr);
 	}
 
+	public static int size() {
+		return NATIVE_TO_JAVA.size();
+	}
+
 	/**
 	 * Bulk cleanup: unreferences all tracked RefCounted objects and clears both
 	 * maps. Called during SCENE-level deinitialization, before the JVM is

@@ -267,3 +267,15 @@ jobs:
           GODOT_BIN: ${{ github.workspace }}\godot-bin\Godot_v4.6.2-stable_win64.exe
           GODOT_JAVA_CLASSPATH: ${{ github.workspace }}\godot-java-examples\examples\it-test\godot-java\app.jar
         run: .\mvnw.cmd test -pl godot-java-core -B
+
+      - name: Upload stability diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stability-diagnostics-${{ runner.os }}
+          if-no-files-found: ignore
+          path: |
+            godot-java-core/target/surefire-reports/**
+            godot-java-examples/examples/it-test/.godot/**
+            godot-java-examples/examples/it-test/build/**
+            godot-java-examples/examples/it-test/godot-java/**

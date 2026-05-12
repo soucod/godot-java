@@ -4,9 +4,14 @@ import org.godot.annotation.Export;
 import org.godot.annotation.GodotClass;
 import org.godot.annotation.GodotMethod;
 import org.godot.annotation.Signal;
+import org.godot.bridge.Bridge;
+import org.godot.internal.NativeMemoryTracker;
+import org.godot.internal.ref.JavaObjectMap;
+import org.godot.internal.ref.RefCountedHelper;
 import org.godot.math.Vector2;
 import org.godot.node.Control;
 import org.godot.node.Node;
+import org.godot.node.RefCounted;
 
 /**
  * Integration test node. Validates all core features from the Java side.
@@ -21,6 +26,7 @@ public class IntegrationTestNode extends Node {
 	private int processCount = 0;
 	private int lastNotification = -1;
 	private int notificationCount = 0;
+	private final StringBuilder lifecycleEvents = new StringBuilder();
 
 	@Export
 	public int exportedInt = 42;
@@ -45,9 +51,22 @@ public class IntegrationTestNode extends Node {
 	}
 
 	@Override
+	public void _enterTree() {
+		recordLifecycleEvent("enter_tree");
+		System.out.println("[IT] _enterTree called");
+	}
+
+	@Override
 	public void _ready() {
 		readyCalled = true;
+		recordLifecycleEvent("ready");
 		System.out.println("[IT] _ready called");
+	}
+
+	@Override
+	public void _exitTree() {
+		recordLifecycleEvent("exit_tree");
+		System.out.println("[IT] _exitTree called");
 	}
 
 	@Override
@@ -62,6 +81,7 @@ public class IntegrationTestNode extends Node {
 		if (!processCalled) {
 			processCalled = true;
 			lastDelta = delta;
+			recordLifecycleEvent("process");
 			System.out.println("[IT] _process called, delta=" + delta);
 		}
 		processCount++;
@@ -72,6 +92,13 @@ public class IntegrationTestNode extends Node {
 	}
 
 	// ---- Methods callable from GDScript ----
+
+	private void recordLifecycleEvent(String event) {
+		if (!lifecycleEvents.isEmpty()) {
+			lifecycleEvents.append(",");
+		}
+		lifecycleEvents.append(event);
+	}
 
 	@GodotMethod
 	public boolean wasReadyCalled() {
@@ -116,6 +143,11 @@ public class IntegrationTestNode extends Node {
 	}
 
 	@GodotMethod
+	public String getLifecycleEvents() {
+		return lifecycleEvents.toString();
+	}
+
+	@GodotMethod
 	public void emitTestSignal(int value) {
 		emitSignal("testSignal", value);
 	}
@@ -133,6 +165,136 @@ public class IntegrationTestNode extends Node {
 	@GodotMethod
 	public void setExportedInt(int val) {
 		exportedInt = val;
+	}
+
+	@GodotMethod
+	public String primitiveDispatchMatrix(int intValue, long longValue, float floatValue, double doubleValue,
+			boolean boolValue, String stringValue) {
+		methodCallCount++;
+		return intValue + ":" + longValue + ":" + Math.round(floatValue * 10.0f) + ":" + Math.round(doubleValue * 10.0)
+				+ ":" + boolValue + ":" + stringValue;
+	}
+
+	@GodotMethod
+	public double vector2LengthSquared(Vector2 value) {
+		methodCallCount++;
+		return value.x * value.x + value.y * value.y;
+	}
+
+	@GodotMethod
+	public boolean generatedRegistryAvailable() {
+		try {
+			Class.forName("org.godot.internal.GeneratedClassRegistry");
+			return true;
+		} catch (ClassNotFoundException e) {
+			return false;
+		}
+	}
+
+	@GodotMethod
+	public int getJavaObjectMapSize() {
+		return JavaObjectMap.size();
+	}
+
+	@GodotMethod
+	public int getTrackedRefCountedCount() {
+		return RefCountedHelper.trackedReferenceCount();
+	}
+
+	@GodotMethod
+	public boolean testJavaToGodotNodeChurn(int count) {
+		int before = getChildCount();
+		for (int i = 0; i < count; i++) {
+			Node child = Node.create();
+			if (child == null || !child.isValid()) {
+				System.out.println("FAIL: Node.create returned invalid child at iteration " + i);
+				return false;
+			}
+			addChild(child);
+			if (getChildCount() != before + 1) {
+				System.out.println("FAIL: child count did not increase at iteration " + i);
+				return false;
+			}
+			removeChild(child);
+			child.free();
+			if (getChildCount() != before) {
+				System.out.println("FAIL: child count did not return to baseline at iteration " + i);
+				return false;
+			}
+		}
+		return true;
+	}
+
+	@GodotMethod
+	public boolean testRefCountedLifecycle() {
+		int trackedBefore = RefCountedHelper.trackedReferenceCount();
+		RefCounted value = RefCounted.create();
+		if (value == null || !value.isValid()) {
+			System.out.println("FAIL: RefCounted.create returned invalid object");
+			return false;
+		}
+		long ptr = value.getNativeObject();
+		boolean referenced = RefCountedHelper.reference(ptr);
+		if (!referenced) {
+			System.out.println("FAIL: RefCountedHelper.reference failed");
+			value.unreference();
+			value.setNativeObject(0);
+			return false;
+		}
+		if (RefCountedHelper.trackedReferenceCount() != trackedBefore + 1) {
+			System.out.println("FAIL: RefCountedHelper did not track reference");
+			RefCountedHelper.unreference(ptr);
+			value.unreference();
+			value.setNativeObject(0);
+			return false;
+		}
+		RefCountedHelper.unreference(ptr);
+		value.unreference();
+		value.setNativeObject(0);
+		return RefCountedHelper.trackedReferenceCount() == trackedBefore;
+	}
+
+	@GodotMethod
+	public String captureMemoryStats(String label) {
+		String stats = label + ": " + NativeMemoryTracker.getStats();
+		System.out.println("[IT] " + stats);
+		return stats;
+	}
+
+	@GodotMethod
+	public String runScopedMemoryDiagnostics(int iterations) {
+		long countBefore = NativeMemoryTracker.getLiveAllocationCount();
+		long bytesBefore = NativeMemoryTracker.getLiveBytes();
+		for (int i = 0; i < iterations; i++) {
+			Bridge.runScoped(() -> {
+				Bridge.allocVariant();
+				Bridge.allocate(32);
+			});
+		}
+		long countAfter = NativeMemoryTracker.getLiveAllocationCount();
+		long bytesAfter = NativeMemoryTracker.getLiveBytes();
+		String stats = "scoped-memory-diagnostics iterations=" + iterations + " beforeCount=" + countBefore
+				+ " beforeBytes=" + bytesBefore + " afterCount=" + countAfter + " afterBytes=" + bytesAfter;
+		System.out.println("[IT] " + stats);
+		return stats;
+	}
+
+	@GodotMethod
+	public boolean testShortStress(int iterations) {
+		for (int i = 0; i < iterations; i++) {
+			if (add(i, 1) != i + 1) {
+				return false;
+			}
+			if (!("echo:stress-" + i).equals(echo("stress-" + i))) {
+				return false;
+			}
+			if (vector2LengthSquared(new Vector2(i, 2)) != i * i + 4) {
+				return false;
+			}
+			emitTestSignal(i);
+		}
+		runScopedMemoryDiagnostics(iterations);
+		return testJavaToGodotNodeChurn(Math.max(1, iterations / 10));
 	}
 
 	// ---- Control layout tests (Task 4.5) ----

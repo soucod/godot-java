@@ -156,4 +156,8 @@ public final class RefCountedHelper {
 		}
 		REFFED.clear();
 	}
+
+	public static int trackedReferenceCount() {
+		return REFFED.size();
+	}
 }

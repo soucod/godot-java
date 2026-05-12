@@ -138,16 +138,30 @@ public class GodotIntegrationTest {
 		System.out.println("[DEBUG] .gdextension exists: " + Files.exists(testDir.resolve("godot-java.gdextension")));
 		System.out.println("[DEBUG] .godot/extension_list.cfg exists: "
 				+ Files.exists(testDir.resolve(".godot/extension_list.cfg")));
-		System.out.println(
-				"[DEBUG] godot-java/ dir exists: " + Files.isDirectory(testDir.resolve("godot-java")));
+		Path runtimeDir = testDir.resolve("godot-java");
+		System.out.println("[DEBUG] godot-java/ dir exists: " + Files.isDirectory(runtimeDir));
 		System.out.println("[DEBUG] godot-java/ contents:");
-		try (var stream = Files.list(testDir.resolve("godot-java"))) {
+		try (var stream = Files.list(runtimeDir)) {
 			stream.forEach(p -> System.out.println("[DEBUG]   " + p.getFileName() + " size=" + p.toFile().length()
 					+ " executable=" + p.toFile().canExecute()));
 		} catch (Exception e) {
 			System.out.println("[DEBUG]   ERROR listing godot-java/: " + e.getMessage());
 		}
 		System.out.println("[DEBUG] JAVA_HOME: " + System.getenv("JAVA_HOME"));
+
+		Path runtimeJar = runtimeDir.resolve("app.jar");
+		boolean nativeLibrarySynced = Files.exists(runtimeDir.resolve("libgodot-java.dylib"))
+				|| Files.exists(runtimeDir.resolve("libgodot-java.so"))
+				|| Files.exists(runtimeDir.resolve("libgodot-java.dll"));
+		if (!Files.exists(runtimeJar) || !nativeLibrarySynced) {
+			System.err.println("=================================================================");
+			System.err.println("WARNING: it-test runtime is not synced under: " + runtimeDir);
+			System.err.println("Expected app.jar and a platform libgodot-java native library.");
+			System.err.println("Integration tests will be SKIPPED.");
+			System.err.println("=================================================================");
+			godotAvailable = false;
+			return;
+		}
 
 		ProcessBuilder pb = new ProcessBuilder(godotBin.toString(), "--headless", "--quit-after", "10", "--path",
 				testDir.toString());
@@ -276,6 +290,50 @@ public class GodotIntegrationTest {
 		assumeTrue(godotAvailable, "Godot not available, skipping integration test");
 		assertTrue(hasMarker("PASS: onNotification was called"),
 				"onNotification should have been called by Godot. Output:\n" + String.join("\n", outputLines));
+	}
+
+	@Test
+	void testLifecycleOrder() {
+		assumeTrue(godotAvailable, "Godot not available, skipping integration test");
+		assertTrue(hasMarker("PASS: _enterTree() virtual was called"),
+				"_enterTree() should have been called. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: enter_tree occurs before ready"),
+				"Lifecycle order should be stable. Output:\n" + String.join("\n", outputLines));
+	}
+
+	@Test
+	void testDispatchMatrix() {
+		assumeTrue(godotAvailable, "Godot not available, skipping integration test");
+		assertTrue(hasMarker("PASS: primitive dispatch matrix round-trip"),
+				"Primitive dispatch matrix should pass. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: Vector2 dispatch round-trip"),
+				"Vector2 dispatch should pass. Output:\n" + String.join("\n", outputLines));
+	}
+
+	@Test
+	void testStabilityScenarios() {
+		assumeTrue(godotAvailable, "Godot not available, skipping integration test");
+		assertTrue(hasMarker("PASS: Java-to-Godot generated Node wrapper calls survive churn"),
+				"Node churn should pass. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: RefCounted helper reference/unreference lifecycle"),
+				"RefCounted lifecycle should pass. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: generated class registry is present"),
+				"Generated registry should be present. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: stability stress run completed"),
+				"Short stability stress should pass. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: JavaObjectMap shrinks after Java-backed node queue_free"),
+				"JavaObjectMap cleanup should pass. Output:\n" + String.join("\n", outputLines));
+	}
+
+	@Test
+	void testMemoryDiagnosticsRecorded() {
+		assumeTrue(godotAvailable, "Godot not available, skipping integration test");
+		assertTrue(hasMarker("TEST_DIAGNOSTIC: startup: NativeMemoryTracker"),
+				"Startup memory diagnostics should be recorded. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("TEST_DIAGNOSTIC: scoped-memory-diagnostics"),
+				"Scoped memory diagnostics should be recorded. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("TEST_DIAGNOSTIC: teardown: NativeMemoryTracker"),
+				"Teardown memory diagnostics should be recorded. Output:\n" + String.join("\n", outputLines));
 	}
 
 	// ----------------------------------------------------------------

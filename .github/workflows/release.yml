@@ -234,6 +234,11 @@ jobs:
           core_text = core_text.replace("""            <artifactId>log4j-api</artifactId>""", f"""            <artifactId>log4j-api</artifactId>\n            <version>{log4j2_version}</version>""", 1)
           core_text = core_text.replace("""            <artifactId>log4j-core</artifactId>""", f"""            <artifactId>log4j-core</artifactId>\n            <version>{log4j2_version}</version>\n            <scope>runtime</scope>""", 1)
           core.write_text(core_text)
+
+          examples = Path("godot-java-examples/pom.xml")
+          examples_text = examples.read_text()
+          examples_text = examples_text.replace("""            <artifactId>godot-java-core</artifactId>\n            <version>${revision}</version>""", f"""            <artifactId>godot-java-core</artifactId>\n            <version>{revision}</version>""", 1)
+          examples.write_text(examples_text)
           PY
 
       - name: Build and publish

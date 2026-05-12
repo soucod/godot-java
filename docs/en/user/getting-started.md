@@ -168,7 +168,7 @@ Key points:
 - `@GodotClass` registers the class with Godot's ClassDB (auto-discovered at startup).
 - `@Export` exposes a field to the Godot editor Inspector panel.
 - `@Signal` declares a signal; the method body is unused, only the signature matters.
-- `@GodotMethod` makes a method callable from GDScript.
+- `@GodotMethod` makes a method callable through Godot's object system.
 - Virtual methods like `_ready()` are overridden normally with `@Override`.
 
 ## Step 4: Compile
@@ -181,17 +181,34 @@ On success, class files appear in `target/classes/`.
 
 ## Step 5: Deploy to Your Godot Project
 
-### 5.1 Download the Native Library
+### 5.1 Package Your Java App Jar
 
-Download the platform-native shared library from [GitHub Releases](https://github.com/youngledo/godot-java/releases):
+Godot loads the native GDExtension first, then godot-java starts a JVM and loads your Java application jar. In a real project this should be a fat/shaded jar that contains your game classes, `godot-java-core`, third-party dependencies, and the annotation-processor generated registry.
 
-| Platform | File |
-|---|---|
-| macOS (ARM64 / x86_64) | `libgodot-java.dylib` |
-| Linux (x86_64) | `libgodot-java.so` |
-| Windows (x86_64) | `godot-java.dll` |
+The standard runtime directory is:
 
-Place it in your Godot project under `native/`.
+```
+your-godot-project/
+  godot-java/
+    app.jar
+    libgodot-java.dylib    # or .so / .dll for the current platform
+```
+
+In an application project, this should be part of the project build. The
+`godot-java-template` Maven build runs this during `mvn package`: it creates
+`target/app.jar`, resolves the matching `godot-java-native` classifier artifact,
+and writes both files into the Godot project.
+
+For repository examples and framework release verification, the source
+repository also includes a sync helper:
+
+```bash
+scripts/sync-godot-java.sh \
+  --project godot-java-examples/examples/it-test \
+  --app-jar godot-java-examples/target/godot-java-examples.jar
+```
+
+By default, the helper resolves the matching `godot-java-native` Maven artifact for the current platform. During local framework development, pass `--native-lib` or `--native-zip` to use a freshly built native library. Application developers should not need the source repository helper when using the template.
 
 ### 5.2 Create the .gdextension File
 
@@ -203,12 +220,12 @@ entry_symbol = "godot_java_init"
 compatibility_minimum = 4.6
 
 [libraries]
-macos.debug = "res://native/libgodot-java.dylib"
-macos.release = "res://native/libgodot-java.dylib"
-linux.debug = "res://native/libgodot-java.so"
-linux.release = "res://native/libgodot-java.so"
-windows.debug = "res://native/godot-java.dll"
-windows.release = "res://native/godot-java.dll"
+macos.debug = "res://godot-java/libgodot-java.dylib"
+macos.release = "res://godot-java/libgodot-java.dylib"
+linux.debug = "res://godot-java/libgodot-java.so"
+linux.release = "res://godot-java/libgodot-java.so"
+windows.debug = "res://godot-java/libgodot-java.dll"
+windows.release = "res://godot-java/libgodot-java.dll"
 ```
 
 ### 5.3 Final Directory Layout
@@ -216,10 +233,10 @@ windows.release = "res://native/godot-java.dll"
 ```
 your-godot-project/
   godot-java.gdextension
-  native/
+  godot-java/
+    app.jar
     libgodot-java.dylib    # or .so / .dll
   scenes/
-  scripts/
 ```
 
 ### 5.4 Enable in Godot
@@ -229,34 +246,27 @@ your-godot-project/
 3. Click **Add** and select the `godot-java.gdextension` file.
 4. Restart the Godot editor.
 
-## Step 6: Use from GDScript
+## Step 6: Use Java Nodes in a Godot Scene
 
-Create a GDScript (e.g., `main.gd`) and attach it to a scene node:
+Create a scene that uses the registered Java class as a node type:
 
-```gdscript
-extends Node2D
+```ini
+[gd_scene load_steps=1 format=3]
 
-func _ready():
-    var health = HealthComponent.new()
-    add_child(health)
-    health.connect("health_changed", self, "_on_health_changed")
-    health.connect("died", self, "_on_died")
-    health.take_damage(30)
-    print("Current health: ", health.get_health())
-
-func _on_health_changed(new_health):
-    print("Health changed to: ", new_health)
-
-func _on_died():
-    print("Entity died!")
+[node name="HealthComponent" type="HealthComponent"]
 ```
 
-Press **F5** to run. The console should output:
+Set this scene as the main scene in `project.godot`, or instantiate the Java
+class from another Java node:
 
+```java
+HealthComponent health = new HealthComponent();
+addChild(health);
+health.takeDamage(30);
 ```
-Health changed to: 70
-Current health: 70
-```
+
+Press **F5** to run. Godot loads the GDExtension, godot-java starts the JVM,
+and the Java node is created by Godot's ClassDB.
 
 ## Common Issues
 
@@ -269,13 +279,14 @@ export JAVA_HOME=/path/to/jdk-25
 
 ### "Class not found"
 
-- Run `mvn compile` to compile your classes.
+- Run `mvn package` to build the application jar.
+- Run the sync workflow so `godot-java/app.jar` is updated.
 - Verify the class is annotated with `@GodotClass`.
-- Check that the classpath configured in the C++ layer points to `target/classes/`.
 
 ### Native library load failure
 
 - Verify the `.gdextension` file paths match the actual file locations.
+- Confirm the native library exists in the `godot-java/` runtime directory.
 - Confirm the library architecture matches your Godot editor (x64 vs ARM64).
 
 ## Next Steps

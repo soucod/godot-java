@@ -30,7 +30,7 @@ REM Windows (requires MSVC or MinGW)
 cd godot-java-core\native && build-windows.bat
 ```
 
-This compiles `godot_java.cpp` and deploys the library to `examples/shared-native/`.
+This compiles `godot_java.cpp` into `godot-java-core/native/build/`.
 
 ### 2. Build the fat jar
 
@@ -39,25 +39,23 @@ cd godot-java-examples
 mvn package
 ```
 
-This produces the fat JAR and automatically deploys it to `examples/shared-native/`.
+This produces the fat JAR at `target/godot-java-examples.jar`.
 
-### 3. Set environment variables
+### 3. Sync runtime files into an example
 
-Before running any example, set these environment variables:
+The canonical project-local runtime directory is `godot-java/`, containing `app.jar` and the native GDExtension library:
 
 ```shell
-# macOS / Linux
-export JAVA_HOME=/path/to/jdk-25
-export GODOT_JAVA_CLASSPATH=$(pwd)/examples/shared-native/godot-java-examples.jar
+cd ..
+./scripts/sync-godot-java.sh \
+  --project godot-java-examples/examples/it-test \
+  --app-jar godot-java-examples/target/godot-java-examples.jar \
+  --native-lib godot-java-core/native/build/libgodot-java.dylib
 ```
 
-```powershell
-# Windows PowerShell
-$env:JAVA_HOME = "C:\path\to\jdk-25"
-$env:GODOT_JAVA_CLASSPATH = ".\examples\shared-native\godot-java-examples.jar"
-```
+Use the platform native library name for Linux or Windows. When consuming released artifacts, omit `--native-lib`; the sync helper resolves the matching `godot-java-native` Maven artifact.
 
-### 3. Open an example in Godot
+### 4. Open an example in Godot
 
 Open any example directory under `examples/` as a Godot project:
 
@@ -143,18 +141,21 @@ godot-java-examples/
 ├── pom.xml                       # Maven build (shade → fat jar)
 ├── src/main/java/examples/       # Java example classes
 └── examples/
-    ├── shared-native/            # Shared deployment target (JAR + native lib)
-    │   ├── godot-java-examples.jar
-    │   └── libgodot-java.dylib   # (or .so / .dll per platform)
+    ├── it-test/
+    │   ├── godot-java/           # Synced runtime dir (ignored)
+    │   │   ├── app.jar
+    │   │   └── libgodot-java.dylib   # (or .so / .dll per platform)
+    │   ├── godot-java.gdextension
+    │   └── test_runner.tscn
     ├── 01-hello-world/
-    │   ├── native/               # Symlinks → ../../shared-native/
+    │   ├── native/               # Legacy local runtime dir
     │   ├── godot-java.gdextension
     │   └── main.tscn
     ├── 02-export-properties/
     └── ...
 ```
 
-Each example's `native/` directory contains symlinks to `shared-native/`, so a single build deploys to all examples.
+The `it-test` project uses the canonical `godot-java/` runtime layout. The older feature examples still use their existing `native/` layout until they are migrated.
 
 ## License
 

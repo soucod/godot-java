@@ -5,8 +5,101 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
+  build-native:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            classifier: macos-universal
+            native_profile: native-macos-universal
+            native_build: ./godot-java-core/native/build-macos.sh
+          - os: ubuntu-latest
+            classifier: linux-x86_64
+            native_profile: native-linux-x86_64
+            native_build: ./godot-java-core/native/build-linux.sh
+          - os: windows-latest
+            classifier: windows-x86_64
+            native_profile: native-windows-x86_64
+            native_build: ./godot-java-core/native/build-windows.bat
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Resolve release version
+        shell: bash
+        run: echo "REVISION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang build-essential
+
+      - name: Setup MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build native library (macOS/Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          chmod +x "${{ matrix.native_build }}"
+          "${{ matrix.native_build }}"
+
+      - name: Build native library (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call "${{ matrix.native_build }}"
+
+      - name: Package native artifact (macOS/Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./mvnw package -pl godot-java-native -Drevision="$REVISION" -Ppackage-native,${{ matrix.native_profile }} -Dspotless.skip=true -B
+
+      - name: Package native artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: .\mvnw.cmd package -pl godot-java-native -Drevision=%REVISION% -Ppackage-native,${{ matrix.native_profile }} -Dspotless.skip=true -B
+
+      - name: Stage native artifact
+        shell: bash
+        run: |
+          mkdir -p native-artifact
+          cp godot-java-native/target/godot-java-native-"$REVISION"-${{ matrix.classifier }}.zip native-artifact/
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-java-native-${{ matrix.classifier }}
+          path: native-artifact/*.zip
+
   publish:
+    needs: build-native
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +118,11 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang build-essential
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
@@ -51,6 +149,13 @@ jobs:
 
       - name: Resolve release version
         run: echo "REVISION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: godot-java-native-*
+          path: dist/native
+          merge-multiple: true
 
       - name: Prepare Central publish POMs
         run: |
@@ -89,6 +194,7 @@ jobs:
               Path("godot-java-code-generator/pom.xml"),
               Path("godot-java-core/pom.xml"),
               Path("godot-java-examples/pom.xml"),
+              Path("godot-java-native/pom.xml"),
           ]:
               text = central_compatible_pom(path.read_text())
               if "<parent/>" not in text:
@@ -134,4 +240,49 @@ jobs:
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
-        run: ./mvnw deploy central-publishing:publish -P release -Drevision="$REVISION" -DskipTests -B
+        run: ./mvnw deploy central-publishing:publish -P release -Drevision="$REVISION" -Dgodot.java.native.attach.dir="$PWD/dist/native" -DskipTests -B
+
+      - name: Attach native fallback artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/native/*.zip
+
+  bump-next-development-version:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve next snapshot version
+        shell: bash
+        run: |
+          RELEASE_VERSION="${GITHUB_REF_NAME#v}"
+          IFS=. read -r MAJOR MINOR PATCH <<< "$RELEASE_VERSION"
+          if [[ -z "$MAJOR" || -z "$MINOR" || -z "$PATCH" || "$PATCH" == *-* ]]; then
+            echo "Unsupported release version for automatic bump: $RELEASE_VERSION" >&2
+            exit 1
+          fi
+          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))-SNAPSHOT"
+          echo "NEXT_VERSION=$NEXT_VERSION" >> "$GITHUB_ENV"
+
+      - name: Bump revision property
+        shell: bash
+        run: |
+          ruby -0pi -e 'version = ENV.fetch("NEXT_VERSION"); sub(%r{<revision>[^<]+</revision>}, "<revision>#{version}</revision>")' pom.xml
+          git diff -- pom.xml
+
+      - name: Commit next development version
+        shell: bash
+        run: |
+          if git diff --quiet -- pom.xml; then
+            echo "pom.xml already uses $NEXT_VERSION"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pom.xml
+          git commit -m "Bump revision to $NEXT_VERSION"
+          git push origin HEAD:main

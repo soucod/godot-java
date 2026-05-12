@@ -138,13 +138,14 @@ public class GodotIntegrationTest {
 		System.out.println("[DEBUG] .gdextension exists: " + Files.exists(testDir.resolve("godot-java.gdextension")));
 		System.out.println("[DEBUG] .godot/extension_list.cfg exists: "
 				+ Files.exists(testDir.resolve(".godot/extension_list.cfg")));
-		System.out.println("[DEBUG] native/ dir exists: " + Files.isDirectory(testDir.resolve("native")));
-		System.out.println("[DEBUG] native/ contents:");
-		try (var stream = Files.list(testDir.resolve("native"))) {
+		System.out.println(
+				"[DEBUG] godot-java/ dir exists: " + Files.isDirectory(testDir.resolve("godot-java")));
+		System.out.println("[DEBUG] godot-java/ contents:");
+		try (var stream = Files.list(testDir.resolve("godot-java"))) {
 			stream.forEach(p -> System.out.println("[DEBUG]   " + p.getFileName() + " size=" + p.toFile().length()
 					+ " executable=" + p.toFile().canExecute()));
 		} catch (Exception e) {
-			System.out.println("[DEBUG]   ERROR listing native/: " + e.getMessage());
+			System.out.println("[DEBUG]   ERROR listing godot-java/: " + e.getMessage());
 		}
 		System.out.println("[DEBUG] JAVA_HOME: " + System.getenv("JAVA_HOME"));
 

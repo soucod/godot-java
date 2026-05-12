@@ -30,7 +30,7 @@ REM Windows（需要 MSVC 或 MinGW）
 cd godot-java-core\native && build-windows.bat
 ```
 
-编译 `godot_java.cpp` 并将库部署到 `examples/shared-native/`。
+编译 `godot_java.cpp`，产物位于 `godot-java-core/native/build/`。
 
 ### 2. 构建 fat jar
 
@@ -39,25 +39,23 @@ cd godot-java-examples
 mvn package
 ```
 
-生成 fat JAR 并自动部署到 `examples/shared-native/`。
+生成 fat JAR：`target/godot-java-examples.jar`。
 
-### 3. 设置环境变量
+### 3. 同步运行时文件到示例项目
 
-运行示例前，设置以下环境变量：
+标准项目本地运行目录为 `godot-java/`，里面放 `app.jar` 和原生 GDExtension 库：
 
 ```bash
-# macOS / Linux
-export JAVA_HOME=/path/to/jdk-25
-export GODOT_JAVA_CLASSPATH=$(pwd)/examples/shared-native/godot-java-examples.jar
+cd ..
+./scripts/sync-godot-java.sh \
+  --project godot-java-examples/examples/it-test \
+  --app-jar godot-java-examples/target/godot-java-examples.jar \
+  --native-lib godot-java-core/native/build/libgodot-java.dylib
 ```
 
-```powershell
-# Windows PowerShell
-$env:JAVA_HOME = "C:\path\to\jdk-25"
-$env:GODOT_JAVA_CLASSPATH = ".\examples\shared-native\godot-java-examples.jar"
-```
+Linux 或 Windows 请替换为对应平台的原生库文件名。使用已发布版本时，可以省略 `--native-lib`，同步脚本会解析匹配的 `godot-java-native` Maven artifact。
 
-### 3. 在 Godot 中打开示例
+### 4. 在 Godot 中打开示例
 
 用 Godot 打开 `examples/` 下的任意示例目录：
 
@@ -143,18 +141,21 @@ godot-java-examples/
 ├── pom.xml                       # Maven 构建（shade 打 fat jar）
 ├── src/main/java/examples/       # Java 示例类
 └── examples/
-    ├── shared-native/            # 共享部署目录（JAR + 原生库）
-    │   ├── godot-java-examples.jar
-    │   └── libgodot-java.dylib   # （或 .so / .dll，取决于平台）
+    ├── it-test/
+    │   ├── godot-java/           # 同步后的运行目录（已忽略）
+    │   │   ├── app.jar
+    │   │   └── libgodot-java.dylib   # 或当前平台的 .so / .dll
+    │   ├── godot-java.gdextension
+    │   └── test_runner.tscn
     ├── 01-hello-world/
-    │   ├── native/               # 符号链接 → ../../shared-native/
+    │   ├── native/               # 旧版本地运行目录
     │   ├── godot-java.gdextension
     │   └── main.tscn
     ├── 02-export-properties/
     └── ...
 ```
 
-每个示例的 `native/` 目录包含指向 `shared-native/` 的符号链接，一次构建即可部署到所有示例。
+`it-test` 项目已经使用标准 `godot-java/` 运行布局。其它功能示例仍保留原有 `native/` 布局，后续会逐步迁移。
 
 ## 许可证
 

@@ -16,14 +16,23 @@ jobs:
             godot_url: https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_macos.universal.zip
             godot_exe: Godot.app/Contents/MacOS/Godot
             native_build: ./godot-java-core/native/build-macos.sh
+            native_profile: native-macos-universal
+            export_preset: macOS
+            export_output: build/macos/godot-java-it-test.zip
           - os: ubuntu-latest
             godot_url: https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_linux.x86_64.zip
             godot_exe: Godot_v4.6.2-stable_linux.x86_64
             native_build: ./godot-java-core/native/build-linux.sh
+            native_profile: native-linux-x86_64
+            export_preset: Linux
+            export_output: build/linux/godot-java-it-test.x86_64
           - os: windows-latest
             godot_url: https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_win64.exe.zip
             godot_exe: Godot_v4.6.2-stable_win64.exe
             native_build: ./godot-java-core/native/build-windows.bat
+            native_profile: native-windows-x86_64
+            export_preset: Windows
+            export_output: build/windows/godot-java-it-test.exe
 
     runs-on: ${{ matrix.os }}
 
@@ -81,8 +90,6 @@ jobs:
           echo "=== Building native library (macOS) ==="
           chmod +x "${{ matrix.native_build }}"
           "${{ matrix.native_build }}"
-          echo "=== shared-native/ contents ==="
-          ls -la godot-java-examples/examples/shared-native/ || echo "not found"
           echo "source build:"
           ls -la godot-java-core/native/build/ || echo "not found"
 
@@ -92,8 +99,6 @@ jobs:
           echo "=== Building native library (Linux) ==="
           chmod +x "${{ matrix.native_build }}"
           "${{ matrix.native_build }}"
-          echo "=== shared-native/ contents ==="
-          ls -la godot-java-examples/examples/shared-native/ || echo "not found"
           echo "source build:"
           ls -la godot-java-core/native/build/ || echo "not found"
 
@@ -103,8 +108,6 @@ jobs:
         run: |
           echo === Building native library (Windows) ===
           call "${{ matrix.native_build }}"
-          echo === shared-native contents ===
-          dir godot-java-examples\examples\shared-native\ 2>nul || echo not found
           echo source build:
           dir godot-java-core\native\build\ 2>nul || echo not found
 
@@ -120,43 +123,36 @@ jobs:
           cat godot-java-examples/examples/it-test/.godot/extension_list.cfg
           echo "--- end ---"
 
-      - name: Copy JAR to shared-native (bash)
+      - name: Package native artifact (macOS/Linux)
         if: runner.os != 'Windows'
-        run: |
-          echo "=== Deploying JAR to shared-native/ ==="
-          mkdir -p godot-java-examples/examples/shared-native
-          cp godot-java-examples/target/godot-java-examples.jar godot-java-examples/examples/shared-native/
-          echo "=== shared-native/ contents ==="
-          ls -la godot-java-examples/examples/shared-native/
-          echo "=== it-test/native/ (symlinks) ==="
-          ls -la godot-java-examples/examples/it-test/native/
+        run: ./mvnw package -pl godot-java-native -Ppackage-native,${{ matrix.native_profile }} -Dspotless.skip=true -B
 
-      - name: Copy JAR to shared-native (Windows)
+      - name: Package native artifact (Windows)
         if: runner.os == 'Windows'
         shell: cmd
-        run: |
-          echo === Deploying JAR to shared-native ===
-          if not exist "godot-java-examples\examples\shared-native" mkdir "godot-java-examples\examples\shared-native"
-          copy godot-java-examples\target\godot-java-examples.jar godot-java-examples\examples\shared-native\
-          echo === shared-native contents ===
-          dir godot-java-examples\examples\shared-native\
+        run: .\mvnw.cmd package -pl godot-java-native -Ppackage-native,${{ matrix.native_profile }} -Dspotless.skip=true -B
 
-      - name: Deploy native library and JAR to it-test (macOS/Linux)
+      - name: Sync godot-java runtime to it-test (bash)
         if: runner.os != 'Windows'
         run: |
-          echo "=== Copying shared-native to it-test/native (symlinks not in git) ==="
-          cp godot-java-examples/examples/shared-native/godot-java-examples.jar godot-java-examples/examples/it-test/native/
-          cp godot-java-examples/examples/shared-native/libgodot-java.* godot-java-examples/examples/it-test/native/ 2>/dev/null || true
-          ls -la godot-java-examples/examples/it-test/native/
+          chmod +x scripts/sync-godot-java.sh
+          NATIVE_ZIP=$(find godot-java-native/target -name 'godot-java-native-*.zip' | head -1)
+          scripts/sync-godot-java.sh \
+            --project godot-java-examples/examples/it-test \
+            --app-jar godot-java-examples/target/godot-java-examples.jar \
+            --native-zip "$NATIVE_ZIP"
+          ls -la godot-java-examples/examples/it-test/godot-java/
 
-      - name: Deploy native library and JAR to it-test (Windows)
+      - name: Sync godot-java runtime to it-test (Windows)
         if: runner.os == 'Windows'
-        shell: cmd
+        shell: bash
         run: |
-          echo === Copying shared-native to it-test/native ===
-          copy /Y godot-java-examples\examples\shared-native\godot-java-examples.jar godot-java-examples\examples\it-test\native\
-          copy /Y godot-java-examples\examples\shared-native\libgodot-java.dll godot-java-examples\examples\it-test\native\
-          dir godot-java-examples\examples\it-test\native\
+          NATIVE_ZIP=$(find godot-java-native/target -name 'godot-java-native-*.zip' | head -1)
+          scripts/sync-godot-java.sh \
+            --project godot-java-examples/examples/it-test \
+            --app-jar godot-java-examples/target/godot-java-examples.jar \
+            --native-zip "$NATIVE_ZIP"
+          ls -la godot-java-examples/examples/it-test/godot-java/
 
       - name: Verify test environment
         shell: bash
@@ -165,8 +161,8 @@ jobs:
           cat godot-java-examples/examples/it-test/godot-java.gdextension
           echo "=== .gdextension hex dump (first line) ==="
           head -1 godot-java-examples/examples/it-test/godot-java.gdextension | xxd | head -3
-          echo "=== native/ contents ==="
-          ls -la godot-java-examples/examples/it-test/native/
+          echo "=== godot-java/ contents ==="
+          ls -la godot-java-examples/examples/it-test/godot-java/
           echo "=== extension_list.cfg ==="
           cat godot-java-examples/examples/it-test/.godot/extension_list.cfg
           echo "=== Godot binary ==="
@@ -174,18 +170,94 @@ jobs:
           echo "=== JAVA_HOME ==="
           echo "$JAVA_HOME"
 
+      - name: Install Godot export templates
+        shell: bash
+        run: |
+          case "${RUNNER_OS}" in
+            Linux)
+              TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.6.2.stable"
+              ;;
+            macOS)
+              TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/4.6.2.stable"
+              ;;
+            Windows)
+              TEMPLATE_DIR="$APPDATA/Godot/export_templates/4.6.2.stable"
+              ;;
+            *)
+              echo "Unsupported runner OS: ${RUNNER_OS}" >&2
+              exit 1
+              ;;
+          esac
+          mkdir -p "$TEMPLATE_DIR"
+          curl -L -o godot-bin/export_templates.tpz https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_export_templates.tpz
+          unzip -q godot-bin/export_templates.tpz -d godot-bin/export_templates
+          cp godot-bin/export_templates/templates/* "$TEMPLATE_DIR/"
+
+      - name: Export smoke project
+        shell: bash
+        env:
+          GODOT_JAVA_CLASSPATH: ${{ github.workspace }}/godot-java-examples/examples/it-test/godot-java/app.jar
+        run: |
+          mkdir -p "$(dirname "godot-java-examples/examples/it-test/${{ matrix.export_output }}")"
+          godot-bin/${{ matrix.godot_exe }} \
+            --headless \
+            --path godot-java-examples/examples/it-test \
+            --export-release "${{ matrix.export_preset }}" \
+            "${{ matrix.export_output }}"
+
+      - name: Run exported smoke project (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          EXPORT_DIR=godot-java-examples/examples/it-test/build/linux
+          rm -rf "$EXPORT_DIR/godot-java"
+          cp -R godot-java-examples/examples/it-test/godot-java "$EXPORT_DIR/godot-java"
+          (
+            cd "$EXPORT_DIR"
+            GODOT_JAVA_CLASSPATH="$PWD/godot-java/app.jar" ./godot-java-it-test.x86_64 --headless
+          )
+
+      - name: Run exported smoke project (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          unzip -q godot-java-examples/examples/it-test/build/macos/godot-java-it-test.zip -d godot-java-examples/examples/it-test/build/macos/exported
+          EXE=$(find godot-java-examples/examples/it-test/build/macos/exported -path '*.app/Contents/MacOS/*' -type f | head -1)
+          APP_DIR="${EXE%/Contents/MacOS/*}"
+          RUNTIME_DIR="$APP_DIR/Contents/Resources/godot-java"
+          rm -rf "$RUNTIME_DIR"
+          mkdir -p "$RUNTIME_DIR"
+          cp -R godot-java-examples/examples/it-test/godot-java/. "$RUNTIME_DIR/"
+          RUNTIME_DIR="$(cd "$RUNTIME_DIR" && pwd)"
+          ls -la "$RUNTIME_DIR"
+          jar tf "$RUNTIME_DIR/app.jar" | grep 'org/godot/bootstrap/Bootstrap.class'
+          chmod +x "$EXE"
+          GODOT_JAVA_CLASSPATH="$RUNTIME_DIR/app.jar" "$EXE" --headless
+
+      - name: Run exported smoke project (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          EXPORT_DIR=godot-java-examples/examples/it-test/build/windows
+          rm -rf "$EXPORT_DIR/godot-java"
+          cp -R godot-java-examples/examples/it-test/godot-java "$EXPORT_DIR/godot-java"
+          (
+            cd "$EXPORT_DIR"
+            GODOT_JAVA_CLASSPATH="$PWD/godot-java/app.jar" ./godot-java-it-test.exe --headless
+          )
+
       - name: Run all tests (macOS)
         if: runner.os == 'macOS'
         env:
           GODOT_BIN: ${{ github.workspace }}/godot-bin/Godot.app/Contents/MacOS/Godot
-          GODOT_JAVA_CLASSPATH: ${{ github.workspace }}/godot-java-examples/examples/shared-native/godot-java-examples.jar
+          GODOT_JAVA_CLASSPATH: ${{ github.workspace }}/godot-java-examples/examples/it-test/godot-java/app.jar
         run: ./mvnw test -pl godot-java-core -B
 
       - name: Run all tests (Linux)
         if: runner.os == 'Linux'
         env:
           GODOT_BIN: ${{ github.workspace }}/godot-bin/Godot_v4.6.2-stable_linux.x86_64
-          GODOT_JAVA_CLASSPATH: ${{ github.workspace }}/godot-java-examples/examples/shared-native/godot-java-examples.jar
+          GODOT_JAVA_CLASSPATH: ${{ github.workspace }}/godot-java-examples/examples/it-test/godot-java/app.jar
         run: ./mvnw test -pl godot-java-core -B
 
       - name: Run all tests (Windows)
@@ -193,5 +265,5 @@ jobs:
         shell: cmd
         env:
           GODOT_BIN: ${{ github.workspace }}\godot-bin\Godot_v4.6.2-stable_win64.exe
-          GODOT_JAVA_CLASSPATH: ${{ github.workspace }}\godot-java-examples\examples\shared-native\godot-java-examples.jar
+          GODOT_JAVA_CLASSPATH: ${{ github.workspace }}\godot-java-examples\examples\it-test\godot-java\app.jar
         run: .\mvnw.cmd test -pl godot-java-core -B

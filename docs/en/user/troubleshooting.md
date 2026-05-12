@@ -2,6 +2,18 @@
 
 Common errors and solutions when using godot-java.
 
+For projects created from `godot-java-template`, start with:
+
+```bash
+./mvnw package
+./mvnw verify -Pgodot-doctor
+```
+
+`package` builds and syncs Java and native artifacts. `godot-doctor` checks the
+JDK version, Godot project files, `godot/godot-java/app.jar`, and the platform
+native library. It also verifies that the generated Java class registry is
+present inside `app.jar`.
+
 ---
 
 ## 1. JVM Not Found
@@ -71,6 +83,18 @@ Common mistakes:
 - Incorrect path (`res://godot-java/` should match the project-local runtime directory).
 - Running `mvn compile` instead of `mvn package`; the template syncs runtime files during `package`.
 
+In the template, the expected runtime layout is:
+
+```text
+godot/
+  godot-java.gdextension
+  godot-java/
+    app.jar
+    libgodot-java.dylib    # macOS
+    libgodot-java.so       # Linux
+    libgodot-java.dll      # Windows
+```
+
 3. Check library dependencies:
 ```bash
 otool -L godot-java/libgodot-java.dylib    # macOS
@@ -114,7 +138,7 @@ Verify the dependency in `pom.xml`:
 <dependency>
     <groupId>io.github.youngledo</groupId>
     <artifactId>godot-java-core</artifactId>
-    <version>0.1.2</version>
+    <version>0.1.3</version>
 </dependency>
 ```
 
@@ -167,18 +191,32 @@ ERROR: Class not found: com.example.MyClass
 
 **Solution:**
 
-1. Verify the class is compiled:
+1. For template projects, rebuild and sync the fat jar:
+
+```bash
+./mvnw package
+```
+
+2. Verify the class is compiled:
 ```bash
 find target/classes -name "MyClass.class"
 ```
 
-2. Check the classpath configuration. The C++ layer sets the classpath when creating the JVM. It must point to the directory containing your compiled classes.
+3. Verify the synced jar exists:
 
-3. Verify the class has the `@GodotClass` annotation:
+```bash
+ls -lh godot/godot-java/app.jar
+```
+
+4. Verify the class has the `@GodotClass` annotation:
 ```java
 @GodotClass(name = "MyClass", parent = "Node")
 public class MyClass extends Node { }
 ```
+
+5. Restart Godot after rebuilding if the editor was already open. The JVM and
+registered Java classes are initialized when the extension loads, so changed
+Java classes are not guaranteed to appear in an existing editor session.
 
 ---
 

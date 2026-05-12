@@ -8,10 +8,34 @@
 
 [Godot](https://godotengine.org/zh-cn/) 的 Java 绑定，通过 GDExtension + Panama FFI 让 Java 在 Godot 生态中成为一等公民。
 
-> 状态：0.1.2——生产就绪，具备 scoped 内存管理、完整 GDExtension 功能覆盖，以及 Maven Central 桌面运行时发布物。
+> 状态：0.1.3——生产就绪，具备 scoped 内存管理、完整 GDExtension 功能覆盖，以及 Maven Central 桌面运行时发布物。
 
-项目示例：
-- [godot-java-template](https://github.com/youngledo/godot-java-template) — 新桌面项目推荐起点
+## 开始新项目
+
+应用开发建议从独立的
+[godot-java-template](https://github.com/youngledo/godot-java-template)
+项目开始。不要把当前框架仓库直接克隆为游戏项目模板。
+
+```bash
+git clone https://github.com/youngledo/godot-java-template.git my-godot-game
+cd my-godot-game
+./mvnw package
+./mvnw verify -Pgodot-run
+```
+
+模板是当前支持的桌面项目布局。它会使用已发布的 Maven artifacts，把你的
+Java 代码构建成 `target/app.jar`，解析匹配平台的 `godot-java-native`
+发布物，并把二者同步到 Godot 项目的 `godot/godot-java/` 目录。
+
+常用模板命令：
+
+- `./mvnw package` — 构建 Java，并同步 `app.jar` 与 native 库
+- `./mvnw verify -Pgodot-run` — 构建、同步，然后启动 Godot 加载当前项目
+- `./mvnw verify -Pgodot-doctor` — 诊断 JDK、`.gdextension`、jar、注册表和 native 布局
+
+只有在贡献绑定本身、运行框架测试或研究内部示例时，才需要直接使用本仓库。
+
+Demo 与示例项目：
 - [godot-java-examples](godot-java-examples/README_ZH.md) — 本仓库内的 10 个小示例
 - [godot-java-demo-projects](https://github.com/youngledo/godot-java-demo-projects) — 107 个 Godot 官方示例的 Java 移植版（2D、3D、音频、GUI、网络、XR 等）
 - [godot-java-3d-demo](https://github.com/youngledo/godot-java-3d-demo) — 3D 角色演示
@@ -301,19 +325,7 @@ godot-java/
 
 ## 我应该从哪开始？
 
-新 Godot Java 项目建议从独立模板开始：
-
-```bash
-git clone https://github.com/youngledo/godot-java-template.git my-godot-game
-cd my-godot-game
-./mvnw package
-godot --path godot
-```
-
-模板使用已发布的 Maven artifacts，并在 `mvn package` 时把 `app.jar` 和匹配平台的 native 库同步到 Godot 项目。
-
-然后阅读 [docs/zh/user/getting-started.md](docs/zh/user/getting-started.md)。
-只有在贡献框架或运行仓库内部示例时，才需要直接使用本仓库源码。
+阅读 [docs/zh/user/getting-started.md](docs/zh/user/getting-started.md)，了解完整的模板工作流、Maven 坐标和手动集成说明。
 
 ---
 

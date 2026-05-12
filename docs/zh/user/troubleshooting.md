@@ -2,6 +2,17 @@
 
 使用 godot-java 时的常见错误及解决方案。
 
+如果项目来自 `godot-java-template`，优先执行：
+
+```bash
+./mvnw package
+./mvnw verify -Pgodot-doctor
+```
+
+`package` 负责构建并同步 Java 与 native 运行时文件。`godot-doctor` 会检查
+JDK 版本、Godot 项目文件、`godot/godot-java/app.jar`，以及当前平台的
+native 库，也会确认 `app.jar` 内存在生成的 Java 类注册表。
+
 ---
 
 ## 1. JVM 未找到
@@ -106,6 +117,18 @@ windows.release = "res://godot-java/libgodot-java.dll"
 - 路径没有指向标准运行目录 `res://godot-java/`
 - `compatibility_minimum` 设为 4.2 而不是 4.6
 - 只执行了 `mvn compile`；模板在 `mvn package` 阶段同步运行时文件
+
+模板项目的预期运行时布局是：
+
+```text
+godot/
+  godot-java.gdextension
+  godot-java/
+    app.jar
+    libgodot-java.dylib    # macOS
+    libgodot-java.so       # Linux
+    libgodot-java.dll      # Windows
+```
 
 3. 检查库的依赖项：
 
@@ -248,10 +271,10 @@ godot-java: FindClass(Bootstrap) failed
 
 **解决方案**
 
-1. 设置 classpath 环境变量：
+1. 对模板项目，先重新构建并同步 fat jar：
 
 ```bash
-export GODOT_JAVA_CLASSPATH="/path/to/your/target/classes:/path/to/godot-java-core/target/classes"
+./mvnw package
 ```
 
 2. 确认类文件已编译：
@@ -260,14 +283,24 @@ export GODOT_JAVA_CLASSPATH="/path/to/your/target/classes:/path/to/godot-java-co
 find target/classes -name "YourClass.class"
 ```
 
-3. 确认类上标注了 `@GodotClass`：
+3. 确认同步后的 jar 存在：
+
+```bash
+ls -lh godot/godot-java/app.jar
+```
+
+4. 确认类上标注了 `@GodotClass`：
 
 ```java
 @GodotClass(name = "MyClass", parent = "Node")  // 必须有此注解
 public class MyClass extends Node { }
 ```
 
-4. 如果使用 Java 模块系统，确认 `module-info.java` 中正确导出了包含 `@GodotClass` 类的包
+5. 如果 Godot 编辑器已经打开，重新构建后请重启 Godot 或重新打开项目。
+JVM 和 Java 类注册发生在扩展加载阶段，已有编辑器会话不保证能看到新 jar
+中的类变化。
+
+6. 如果使用 Java 模块系统，确认 `module-info.java` 中正确导出了包含 `@GodotClass` 类的包
 
 ---
 

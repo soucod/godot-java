@@ -9,10 +9,36 @@ ENGLISH | [中文](README_ZH.md)
 Java bindings for [Godot](https://godotengine.org/).  
 Built on top of GDExtension and Panama FFI to make Java a first-class citizen in the Godot ecosystem.
 
-> Status: 0.1.2 – production-ready with scoped memory management, full GDExtension feature coverage, and Maven Central desktop runtime artifacts.
+> Status: 0.1.3 – production-ready with scoped memory management, full GDExtension feature coverage, and Maven Central desktop runtime artifacts.
 
-Project examples:
-- [godot-java-template](https://github.com/youngledo/godot-java-template) — recommended starting point for new desktop projects
+## Start a New Project
+
+For application development, start from the standalone
+[godot-java-template](https://github.com/youngledo/godot-java-template)
+project. Do not clone this framework repository as the base for a game.
+
+```bash
+git clone https://github.com/youngledo/godot-java-template.git my-godot-game
+cd my-godot-game
+./mvnw package
+./mvnw verify -Pgodot-run
+```
+
+The template is the supported desktop project layout. It consumes released
+Maven artifacts, builds your Java code into `target/app.jar`, resolves the
+matching `godot-java-native` artifact, and syncs both into the Godot project
+under `godot/godot-java/`.
+
+Useful template commands:
+
+- `./mvnw package` — build Java and sync `app.jar` plus the native library
+- `./mvnw verify -Pgodot-run` — build, sync, then launch Godot for this project
+- `./mvnw verify -Pgodot-doctor` — diagnose JDK, `.gdextension`, jar, registry, and native layout
+
+Use this repository directly when contributing to the binding itself, running
+framework tests, or studying the internal examples.
+
+Demo and example projects:
 - [godot-java-examples](godot-java-examples/README.md) — 10 small examples in this repo
 - [godot-java-demo-projects](https://github.com/youngledo/godot-java-demo-projects) — 107 official Godot demos ported to Java (2D, 3D, audio, GUI, networking, XR, and more)
 - [godot-java-3d-demo](https://github.com/youngledo/godot-java-3d-demo) — a 3D character demo
@@ -314,21 +340,8 @@ Then verify:
 
 ## Where to start?
 
-To start a new Godot Java project, use the standalone template:
-
-```bash
-git clone https://github.com/youngledo/godot-java-template.git my-godot-game
-cd my-godot-game
-./mvnw package
-godot --path godot
-```
-
-The template consumes released Maven artifacts and syncs `app.jar` plus the
-matching native desktop library into the Godot project during `mvn package`.
-
-Then read [docs/en/user/getting-started.md](docs/en/user/getting-started.md).
-Use this repository directly only when contributing to the framework or running
-the internal examples.
+Read [docs/en/user/getting-started.md](docs/en/user/getting-started.md) for the
+full template workflow, Maven coordinates, and manual integration notes.
 
 ---
 

@@ -28,7 +28,7 @@ The template already contains:
 git clone https://github.com/youngledo/godot-java-template.git my-godot-game
 cd my-godot-game
 ./mvnw package
-godot --path godot
+./mvnw verify -Pgodot-run
 ```
 
 After `./mvnw package`, the Godot project contains:
@@ -48,7 +48,7 @@ The Maven property `godot-java.version` controls both Java and native artifacts.
 
 ```xml
 <properties>
-    <godot-java.version>0.1.2</godot-java.version>
+    <godot-java.version>0.1.3</godot-java.version>
     <maven.compiler.release>25</maven.compiler.release>
 </properties>
 ```
@@ -133,8 +133,27 @@ Rebuild and run:
 
 ```bash
 ./mvnw package
-godot --path godot
+./mvnw verify -Pgodot-run
 ```
+
+`./mvnw package` is the primary build and sync command. The optional
+`godot-run` profile runs the same Maven lifecycle and then launches Godot with
+the template's `godot/` project. If Godot is not on `PATH`, override the
+executable:
+
+```bash
+./mvnw verify -Pgodot-run -Dgodot.executable=/Applications/Godot.app/Contents/MacOS/Godot
+```
+
+For local diagnostics, run:
+
+```bash
+./mvnw verify -Pgodot-doctor
+```
+
+The doctor profile checks the Maven JDK version, Godot project files, synced
+`app.jar`, the generated Java class registry inside the jar, and the current
+platform native library.
 
 ## Use Java Nodes in Godot
 
@@ -165,7 +184,7 @@ Add the Java dependency:
     <dependency>
         <groupId>io.github.youngledo</groupId>
         <artifactId>godot-java-core</artifactId>
-        <version>0.1.2</version>
+        <version>0.1.3</version>
     </dependency>
 </dependencies>
 ```
@@ -204,7 +223,7 @@ windows.release = "res://godot-java/libgodot-java.dll"
 The native library is distributed as:
 
 ```text
-io.github.youngledo:godot-java-native:0.1.2:zip:<classifier>
+io.github.youngledo:godot-java-native:0.1.3:zip:<classifier>
 ```
 
 The native artifact version must match the `godot-java-core` version inside `app.jar`.

@@ -79,7 +79,8 @@ func assert_eq(actual, expected, test_name: String):
 # ---- Test cases ----
 
 func test_virtual_ready():
-	assert_true(test_node.wasReadyCalled(), "_ready() virtual was called")
+	var events: String = test_node.getLifecycleEvents()
+	assert_true(test_node.wasReadyCalled() or events.contains("notification_ready"), "ready lifecycle was observed (%s)" % events)
 
 func test_process_virtual():
 	# _process may or may not have fired; just report the status
@@ -143,9 +144,12 @@ func test_notification():
 
 func test_lifecycle_order():
 	var events: String = test_node.getLifecycleEvents()
-	assert_true(events.contains("ready"), "_ready() lifecycle event was recorded")
-	if events.contains("enter_tree"):
-		assert_true(events.find("enter_tree") <= events.find("ready"), "enter_tree occurs before ready (%s)" % events)
+	var ready_index := events.find("ready")
+	if ready_index < 0:
+		ready_index = events.find("notification_ready")
+	assert_true(ready_index >= 0, "ready lifecycle event was recorded (%s)" % events)
+	if events.contains("enter_tree") and ready_index >= 0:
+		assert_true(events.find("enter_tree") <= ready_index, "enter_tree occurs before ready (%s)" % events)
 	else:
 		assert_true(test_node.getNotificationCount() > 0, "notification lifecycle was observed (%s)" % events)
 

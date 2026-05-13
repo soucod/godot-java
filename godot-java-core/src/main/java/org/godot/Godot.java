@@ -11,8 +11,13 @@ import org.apache.logging.log4j.Logger;
 
 import java.lang.foreign.MemorySegment;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
+import static java.lang.foreign.ValueLayout.JAVA_BYTE;
+import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
+import static java.lang.foreign.ValueLayout.JAVA_FLOAT;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
+import static java.lang.foreign.ValueLayout.JAVA_LONG;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 
 public abstract class Godot {
@@ -201,6 +206,26 @@ public abstract class Godot {
 		return callMethodBind(className, methodName, hash, MemorySegment.ofAddress(nativeObject), args);
 	}
 
+	protected boolean callEngineBool(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 1, ret -> ret.get(JAVA_BYTE, 0) != 0, typedArgs);
+	}
+
+	protected int callEngineInt32(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 4, ret -> ret.get(JAVA_INT, 0), typedArgs);
+	}
+
+	protected long callEngineInt64(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, ret -> ret.get(JAVA_LONG, 0), typedArgs);
+	}
+
+	protected float callEngineFloat32(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 4, ret -> ret.get(JAVA_FLOAT, 0), typedArgs);
+	}
+
+	protected double callEngineFloat64(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, ret -> ret.get(JAVA_DOUBLE, 0), typedArgs);
+	}
+
 	/**
 	 * Call a static method on a Godot engine class. Uses the method bind with a
 	 * null object pointer, which is how the GDExtension API dispatches static
@@ -209,6 +234,96 @@ public abstract class Godot {
 	protected static java.lang.Object callStatic(String className, String methodName, long hash,
 			java.lang.Object... args) {
 		return callMethodBind(className, methodName, hash, MemorySegment.NULL, args);
+	}
+
+	protected static boolean callStaticBool(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 1, ret -> ret.get(JAVA_BYTE, 0) != 0, typedArgs);
+	}
+
+	protected static int callStaticInt32(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 4, ret -> ret.get(JAVA_INT, 0), typedArgs);
+	}
+
+	protected static long callStaticInt64(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, ret -> ret.get(JAVA_LONG, 0), typedArgs);
+	}
+
+	protected static float callStaticFloat32(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 4, ret -> ret.get(JAVA_FLOAT, 0), typedArgs);
+	}
+
+	protected static double callStaticFloat64(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, ret -> ret.get(JAVA_DOUBLE, 0), typedArgs);
+	}
+
+	private <T> T callEnginePtr(String className, String methodName, long hash, long returnSize,
+			Function<MemorySegment, T> reader, Object... typedArgs) {
+		checkValid();
+		return callMethodBindPtr(className, methodName, hash, MemorySegment.ofAddress(nativeObject), returnSize, reader,
+				typedArgs);
+	}
+
+	private static <T> T callStaticPtr(String className, String methodName, long hash, long returnSize,
+			Function<MemorySegment, T> reader, Object... typedArgs) {
+		return callMethodBindPtr(className, methodName, hash, MemorySegment.NULL, returnSize, reader, typedArgs);
+	}
+
+	private static <T> T callMethodBindPtr(String className, String methodName, long hash, MemorySegment object,
+			long returnSize, Function<MemorySegment, T> reader, Object... typedArgs) {
+		return Bridge.runDowncall(() -> Bridge.runScoped(() -> {
+			MemorySegment methodBind = getCachedMethodBind(className, methodName, hash);
+			if (methodBind.address() == 0) {
+				throw new RuntimeException("Method bind not found: " + methodName + " on " + className);
+			}
+
+			MemorySegment argPtrs = typedArgPtrs(typedArgs);
+			MemorySegment ret = Bridge.allocate(returnSize);
+			Bridge.callVoid(ApiIndex.OBJECT_METHOD_BIND_PTRCALL, methodBind, object, argPtrs, ret);
+			return reader.apply(ret);
+		}));
+	}
+
+	private static MemorySegment typedArgPtrs(Object[] typedArgs) {
+		int argc = typedArgs != null ? typedArgs.length : 0;
+		if (argc == 0) {
+			return MemorySegment.NULL;
+		}
+		MemorySegment argPtrs = Bridge.allocate((long) argc * ADDRESS.byteSize());
+		for (int i = 0; i < argc; i++) {
+			MemorySegment slot = typedArgSlot(typedArgs[i]);
+			argPtrs.set(ADDRESS, (long) i * ADDRESS.byteSize(), slot);
+		}
+		return argPtrs;
+	}
+
+	private static MemorySegment typedArgSlot(Object value) {
+		if (value instanceof Boolean b) {
+			MemorySegment slot = Bridge.allocate(1);
+			slot.set(JAVA_BYTE, 0, b ? (byte) 1 : (byte) 0);
+			return slot;
+		}
+		if (value instanceof Float f) {
+			MemorySegment slot = Bridge.allocate(4);
+			slot.set(JAVA_FLOAT, 0, f);
+			return slot;
+		}
+		if (value instanceof Double d) {
+			MemorySegment slot = Bridge.allocate(8);
+			slot.set(JAVA_DOUBLE, 0, d);
+			return slot;
+		}
+		if (value instanceof Byte || value instanceof Short || value instanceof Integer) {
+			MemorySegment slot = Bridge.allocate(4);
+			slot.set(JAVA_INT, 0, ((Number) value).intValue());
+			return slot;
+		}
+		if (value instanceof Long l) {
+			MemorySegment slot = Bridge.allocate(8);
+			slot.set(JAVA_LONG, 0, l);
+			return slot;
+		}
+		throw new IllegalArgumentException(
+				"Unsupported typed ptrcall argument: " + (value == null ? "null" : value.getClass().getName()));
 	}
 
 	private static java.lang.Object callMethodBind(String className, String methodName, long hash, MemorySegment object,

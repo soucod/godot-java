@@ -231,7 +231,7 @@ public class IntegrationTestNode extends Node {
 	}
 
 	private int childCount() {
-		return ((Number) call("get_child_count", false)).intValue();
+		return getChildCount(false);
 	}
 
 	@GodotMethod

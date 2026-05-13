@@ -402,8 +402,14 @@ public class JavaClassGenerator {
 				methodBuilder.addModifiers(Modifier.PUBLIC, Modifier.STATIC);
 				if (!returnType.equals("void")) {
 					methodBuilder.returns(toTypeName(returnType));
-					methodBuilder.addStatement("return ($T) callStatic($S, $S, $L$L)", toTypeName(returnType),
-							classInfo.name(), method.name(), method.hash() + "L", callArgs);
+					String typedHelper = typedReturnHelper(method, true);
+					if (typedHelper != null && typedArgumentsSupported(method)) {
+						methodBuilder.addStatement("return $L($S, $S, $L$L)", typedHelper, classInfo.name(),
+								method.name(), method.hash() + "L", typedCallArgs(method, paramNames));
+					} else {
+						methodBuilder.addStatement("return ($T) callStatic($S, $S, $L$L)", toTypeName(returnType),
+								classInfo.name(), method.name(), method.hash() + "L", callArgs);
+					}
 				} else {
 					methodBuilder.addStatement("callStatic($S, $S, $L$L)", classInfo.name(), method.name(),
 							method.hash() + "L", callArgs);
@@ -412,8 +418,14 @@ public class JavaClassGenerator {
 				methodBuilder.addModifiers(Modifier.PUBLIC);
 				if (!returnType.equals("void")) {
 					methodBuilder.returns(toTypeName(returnType));
-					methodBuilder.addStatement("return ($T) callEngine($S, $S, $L$L)", toTypeName(returnType),
-							classInfo.name(), method.name(), method.hash() + "L", callArgs);
+					String typedHelper = typedReturnHelper(method, false);
+					if (typedHelper != null && typedArgumentsSupported(method)) {
+						methodBuilder.addStatement("return $L($S, $S, $L$L)", typedHelper, classInfo.name(),
+								method.name(), method.hash() + "L", typedCallArgs(method, paramNames));
+					} else {
+						methodBuilder.addStatement("return ($T) callEngine($S, $S, $L$L)", toTypeName(returnType),
+								classInfo.name(), method.name(), method.hash() + "L", callArgs);
+					}
 				} else {
 					methodBuilder.addStatement("callEngine($S, $S, $L$L)", classInfo.name(), method.name(),
 							method.hash() + "L", callArgs);
@@ -531,6 +543,78 @@ public class JavaClassGenerator {
 			case "boolean", "byte", "short", "int", "long", "float", "double", "char" -> true;
 			default -> false;
 		};
+	}
+
+	private String typedReturnHelper(MethodInfo method, boolean isStatic) {
+		String prefix = isStatic ? "callStatic" : "callEngine";
+		String type = method.returnType();
+		String meta = method.returnMeta();
+		if ("bool".equals(type)) {
+			return prefix + "Bool";
+		}
+		if ("int".equals(type)) {
+			if ("int32".equals(meta)) {
+				return prefix + "Int32";
+			}
+			if (meta == null || meta.isEmpty() || "int64".equals(meta)) {
+				return prefix + "Int64";
+			}
+		}
+		if ("float".equals(type)) {
+			if ("float".equals(meta) || "float32".equals(meta)) {
+				return prefix + "Float32";
+			}
+			if (meta == null || meta.isEmpty() || "double".equals(meta) || "float64".equals(meta)) {
+				return prefix + "Float64";
+			}
+		}
+		return null;
+	}
+
+	private boolean typedArgumentsSupported(MethodInfo method) {
+		for (ArgInfo arg : method.arguments()) {
+			if (typedArgExpression(arg, "unused") == null) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private String typedCallArgs(MethodInfo method, List<String> paramNames) {
+		if (method.arguments().isEmpty()) {
+			return "";
+		}
+		StringBuilder args = new StringBuilder();
+		for (int i = 0; i < method.arguments().size(); i++) {
+			args.append(", ");
+			args.append(typedArgExpression(method.arguments().get(i), paramNames.get(i)));
+		}
+		return args.toString();
+	}
+
+	private String typedArgExpression(ArgInfo arg, String paramName) {
+		String type = arg.type();
+		String meta = arg.meta();
+		if ("bool".equals(type)) {
+			return "java.lang.Boolean.valueOf(" + paramName + ")";
+		}
+		if ("int".equals(type)) {
+			if ("int32".equals(meta)) {
+				return "java.lang.Integer.valueOf((int) " + paramName + ")";
+			}
+			if (meta == null || meta.isEmpty() || "int64".equals(meta)) {
+				return "java.lang.Long.valueOf(" + paramName + ")";
+			}
+		}
+		if ("float".equals(type)) {
+			if ("float".equals(meta) || "float32".equals(meta)) {
+				return "java.lang.Float.valueOf((float) " + paramName + ")";
+			}
+			if (meta == null || meta.isEmpty() || "double".equals(meta) || "float64".equals(meta)) {
+				return "java.lang.Double.valueOf(" + paramName + ")";
+			}
+		}
+		return null;
 	}
 
 	private String defaultValueToJava(ArgInfo arg, String javaType) {

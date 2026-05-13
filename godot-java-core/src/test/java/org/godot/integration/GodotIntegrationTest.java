@@ -297,7 +297,9 @@ public class GodotIntegrationTest {
 		assumeTrue(godotAvailable, "Godot not available, skipping integration test");
 		assertTrue(hasMarker("PASS: ready lifecycle event was recorded"),
 				"Ready lifecycle event should have been recorded. Output:\n" + String.join("\n", outputLines));
-		assertTrue(hasMarker("PASS: enter_tree occurs before ready") || hasMarker("PASS: notification lifecycle was observed"),
+		assertTrue(
+				hasMarker("PASS: enter_tree occurs before ready")
+						|| hasMarker("PASS: notification lifecycle was observed"),
 				"Lifecycle order should be stable. Output:\n" + String.join("\n", outputLines));
 	}
 

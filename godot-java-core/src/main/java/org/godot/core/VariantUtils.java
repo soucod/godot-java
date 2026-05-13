@@ -74,6 +74,8 @@ public final class VariantUtils {
 			return fromBasis(b);
 		if (value instanceof Projection p)
 			return fromProjection(p);
+		if (value instanceof GodotArray a)
+			return fromGodotArray(a);
 		if (value instanceof GodotDictionary d)
 			return fromGodotDictionary(d);
 		if (value instanceof Callable callable)
@@ -978,6 +980,13 @@ public final class VariantUtils {
 		MemorySegment seg = Bridge.allocVariant();
 		seg.set(JAVA_LONG, 8, d.getPtr());
 		seg.set(JAVA_INT, 0, VariantType.DICTIONARY.id());
+		return new Variant(seg);
+	}
+
+	private static Variant fromGodotArray(GodotArray a) {
+		MemorySegment seg = Bridge.allocVariant();
+		seg.set(JAVA_LONG, 8, a.getPtr());
+		seg.set(JAVA_INT, 0, VariantType.ARRAY.id());
 		return new Variant(seg);
 	}
 

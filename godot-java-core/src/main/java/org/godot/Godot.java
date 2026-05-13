@@ -3,13 +3,23 @@ package org.godot;
 import org.godot.internal.api.ApiIndex;
 import org.godot.bridge.Bridge;
 import org.godot.collection.GodotArray;
+import org.godot.collection.GodotDictionary;
+import org.godot.core.Callable;
+import org.godot.core.GodotString;
 import org.godot.core.GodotStringName;
+import org.godot.core.Signal;
 import org.godot.core.Variant;
 import org.godot.core.VariantUtils;
+import org.godot.internal.api.VariantType;
+import org.godot.math.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
+import java.lang.invoke.MethodHandle;
+import java.math.BigInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -29,6 +39,10 @@ public abstract class Godot {
 
 	/** Cache: "className::methodName" → MethodBind pointer. Never evicted. */
 	private static final ConcurrentHashMap<String, MemorySegment> METHOD_BIND_CACHE = new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<String, MethodHandle> BUILTIN_CONSTRUCTOR_CACHE = new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<Integer, MethodHandle> BUILTIN_DESTRUCTOR_CACHE = new ConcurrentHashMap<>();
+	private static final FunctionDescriptor BUILTIN_CONSTRUCTOR_DESC = FunctionDescriptor.ofVoid(ADDRESS, ADDRESS);
+	private static final FunctionDescriptor BUILTIN_DESTRUCTOR_DESC = FunctionDescriptor.ofVoid(ADDRESS);
 
 	private static MemorySegment getCachedMethodBind(String className, String methodName, long hash) {
 		String key = className + "::" + methodName;
@@ -206,6 +220,11 @@ public abstract class Godot {
 		return callMethodBind(className, methodName, hash, MemorySegment.ofAddress(nativeObject), args);
 	}
 
+	protected void callEngineVoid(String className, String methodName, long hash, Object... typedArgs) {
+		checkValid();
+		callMethodBindPtrVoid(className, methodName, hash, MemorySegment.ofAddress(nativeObject), typedArgs);
+	}
+
 	protected boolean callEngineBool(String className, String methodName, long hash, Object... typedArgs) {
 		return callEnginePtr(className, methodName, hash, 1, ret -> ret.get(JAVA_BYTE, 0) != 0, typedArgs);
 	}
@@ -216,6 +235,163 @@ public abstract class Godot {
 
 	protected long callEngineInt64(String className, String methodName, long hash, Object... typedArgs) {
 		return callEnginePtr(className, methodName, hash, 8, ret -> ret.get(JAVA_LONG, 0), typedArgs);
+	}
+
+	protected long callEngineUint32(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 4, ret -> Integer.toUnsignedLong(ret.get(JAVA_INT, 0)),
+				typedArgs);
+	}
+
+	protected BigInteger callEngineUint64(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, ret -> unsignedLongToBigInteger(ret.get(JAVA_LONG, 0)),
+				typedArgs);
+	}
+
+	protected long callEngineRid(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, ret -> ret.get(JAVA_LONG, 0), typedArgs);
+	}
+
+	protected String callEngineString(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 16, VariantType.STRING.id(),
+				ret -> readTypedBuiltinAsString(ret, VariantType.STRING.id()), typedArgs);
+	}
+
+	protected String callEngineStringName(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, VariantType.STRING_NAME.id(),
+				ret -> readTypedBuiltinAsString(ret, VariantType.STRING_NAME.id()), typedArgs);
+	}
+
+	protected String callEngineNodePath(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, VariantType.NODE_PATH.id(),
+				ret -> readTypedBuiltinAsString(ret, VariantType.NODE_PATH.id()), typedArgs);
+	}
+
+	protected Vector2 callEngineVector2(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 16, Vector2::fromSegment, typedArgs);
+	}
+
+	protected Vector2i callEngineVector2i(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, Vector2i::fromSegment, typedArgs);
+	}
+
+	protected Rect2 callEngineRect2(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 32, Rect2::fromSegment, typedArgs);
+	}
+
+	protected Rect2i callEngineRect2i(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 16, Rect2i::fromSegment, typedArgs);
+	}
+
+	protected Vector3 callEngineVector3(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 24, Vector3::fromSegment, typedArgs);
+	}
+
+	protected Vector3i callEngineVector3i(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 12, Vector3i::fromSegment, typedArgs);
+	}
+
+	protected Transform2D callEngineTransform2D(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 48, Transform2D::fromSegment, typedArgs);
+	}
+
+	protected Vector4 callEngineVector4(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 32, Vector4::fromSegment, typedArgs);
+	}
+
+	protected Vector4i callEngineVector4i(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 16, Vector4i::fromSegment, typedArgs);
+	}
+
+	protected Plane callEnginePlane(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 32, Plane::fromSegment, typedArgs);
+	}
+
+	protected Quaternion callEngineQuaternion(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 32, Quaternion::fromSegment, typedArgs);
+	}
+
+	protected AABB callEngineAABB(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 48, AABB::fromSegment, typedArgs);
+	}
+
+	protected Basis callEngineBasis(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 72, Basis::fromSegment, typedArgs);
+	}
+
+	protected Transform3D callEngineTransform3D(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 96, Transform3D::fromSegment, typedArgs);
+	}
+
+	protected Projection callEngineProjection(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 64, Projection::fromSegment, typedArgs);
+	}
+
+	protected Color callEngineColor(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 16, Color::fromSegment, typedArgs);
+	}
+
+	protected <T extends Godot> T callEngineObject(String className, String methodName, long hash,
+			String expectedClassName, boolean refCountedReturn, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8,
+				ret -> wrapTypedObject(readTypedObjectPointer(ret, refCountedReturn), expectedClassName,
+						refCountedReturn),
+				typedArgs);
+	}
+
+	protected Object callEngineVariant(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, Variant.SIZE, VARIANT_SENTINEL,
+				ret -> VariantUtils.toObject(new Variant(ret)), typedArgs);
+	}
+
+	protected byte[] callEnginePackedByteArray(String className, String methodName, long hash, Object... typedArgs) {
+		return (byte[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_BYTE_ARRAY.id(), typedArgs);
+	}
+
+	protected int[] callEnginePackedInt32Array(String className, String methodName, long hash, Object... typedArgs) {
+		return (int[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_INT32_ARRAY.id(), typedArgs);
+	}
+
+	protected long[] callEnginePackedInt64Array(String className, String methodName, long hash, Object... typedArgs) {
+		return (long[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_INT64_ARRAY.id(), typedArgs);
+	}
+
+	protected double[] callEnginePackedFloat32Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return floatArrayToDoubleArray((float[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_FLOAT32_ARRAY.id(), typedArgs));
+	}
+
+	protected double[] callEnginePackedFloat64Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return (double[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_FLOAT64_ARRAY.id(), typedArgs);
+	}
+
+	protected String[] callEnginePackedStringArray(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return (String[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_STRING_ARRAY.id(), typedArgs);
+	}
+
+	protected double[][] callEnginePackedVector2Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return vector2ArrayToDoubleArray((Vector2[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_VECTOR2_ARRAY.id(), typedArgs));
+	}
+
+	protected double[][] callEnginePackedVector3Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return vector3ArrayToDoubleArray((Vector3[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_VECTOR3_ARRAY.id(), typedArgs));
+	}
+
+	protected double[][] callEnginePackedColorArray(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return colorArrayToDoubleArray((Color[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_COLOR_ARRAY.id(), typedArgs));
 	}
 
 	protected float callEngineFloat32(String className, String methodName, long hash, Object... typedArgs) {
@@ -236,6 +412,10 @@ public abstract class Godot {
 		return callMethodBind(className, methodName, hash, MemorySegment.NULL, args);
 	}
 
+	protected static void callStaticVoid(String className, String methodName, long hash, Object... typedArgs) {
+		callMethodBindPtrVoid(className, methodName, hash, MemorySegment.NULL, typedArgs);
+	}
+
 	protected static boolean callStaticBool(String className, String methodName, long hash, Object... typedArgs) {
 		return callStaticPtr(className, methodName, hash, 1, ret -> ret.get(JAVA_BYTE, 0) != 0, typedArgs);
 	}
@@ -246,6 +426,170 @@ public abstract class Godot {
 
 	protected static long callStaticInt64(String className, String methodName, long hash, Object... typedArgs) {
 		return callStaticPtr(className, methodName, hash, 8, ret -> ret.get(JAVA_LONG, 0), typedArgs);
+	}
+
+	protected static long callStaticUint32(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 4, ret -> Integer.toUnsignedLong(ret.get(JAVA_INT, 0)),
+				typedArgs);
+	}
+
+	protected static BigInteger callStaticUint64(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, ret -> unsignedLongToBigInteger(ret.get(JAVA_LONG, 0)),
+				typedArgs);
+	}
+
+	protected static long callStaticRid(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, ret -> ret.get(JAVA_LONG, 0), typedArgs);
+	}
+
+	protected static String callStaticString(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 16, VariantType.STRING.id(),
+				ret -> readTypedBuiltinAsString(ret, VariantType.STRING.id()), typedArgs);
+	}
+
+	protected static String callStaticStringName(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, VariantType.STRING_NAME.id(),
+				ret -> readTypedBuiltinAsString(ret, VariantType.STRING_NAME.id()), typedArgs);
+	}
+
+	protected static String callStaticNodePath(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, VariantType.NODE_PATH.id(),
+				ret -> readTypedBuiltinAsString(ret, VariantType.NODE_PATH.id()), typedArgs);
+	}
+
+	protected static Vector2 callStaticVector2(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 16, Vector2::fromSegment, typedArgs);
+	}
+
+	protected static Vector2i callStaticVector2i(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, Vector2i::fromSegment, typedArgs);
+	}
+
+	protected static Rect2 callStaticRect2(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 32, Rect2::fromSegment, typedArgs);
+	}
+
+	protected static Rect2i callStaticRect2i(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 16, Rect2i::fromSegment, typedArgs);
+	}
+
+	protected static Vector3 callStaticVector3(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 24, Vector3::fromSegment, typedArgs);
+	}
+
+	protected static Vector3i callStaticVector3i(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 12, Vector3i::fromSegment, typedArgs);
+	}
+
+	protected static Transform2D callStaticTransform2D(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 48, Transform2D::fromSegment, typedArgs);
+	}
+
+	protected static Vector4 callStaticVector4(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 32, Vector4::fromSegment, typedArgs);
+	}
+
+	protected static Vector4i callStaticVector4i(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 16, Vector4i::fromSegment, typedArgs);
+	}
+
+	protected static Plane callStaticPlane(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 32, Plane::fromSegment, typedArgs);
+	}
+
+	protected static Quaternion callStaticQuaternion(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 32, Quaternion::fromSegment, typedArgs);
+	}
+
+	protected static AABB callStaticAABB(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 48, AABB::fromSegment, typedArgs);
+	}
+
+	protected static Basis callStaticBasis(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 72, Basis::fromSegment, typedArgs);
+	}
+
+	protected static Transform3D callStaticTransform3D(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 96, Transform3D::fromSegment, typedArgs);
+	}
+
+	protected static Projection callStaticProjection(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 64, Projection::fromSegment, typedArgs);
+	}
+
+	protected static Color callStaticColor(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 16, Color::fromSegment, typedArgs);
+	}
+
+	protected static <T extends Godot> T callStaticObject(String className, String methodName, long hash,
+			String expectedClassName, boolean refCountedReturn, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8,
+				ret -> wrapTypedObject(readTypedObjectPointer(ret, refCountedReturn), expectedClassName,
+						refCountedReturn),
+				typedArgs);
+	}
+
+	protected static Object callStaticVariant(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, Variant.SIZE, VARIANT_SENTINEL,
+				ret -> VariantUtils.toObject(new Variant(ret)), typedArgs);
+	}
+
+	protected static byte[] callStaticPackedByteArray(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return (byte[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_BYTE_ARRAY.id(), typedArgs);
+	}
+
+	protected static int[] callStaticPackedInt32Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return (int[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_INT32_ARRAY.id(), typedArgs);
+	}
+
+	protected static long[] callStaticPackedInt64Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return (long[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_INT64_ARRAY.id(), typedArgs);
+	}
+
+	protected static double[] callStaticPackedFloat32Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return floatArrayToDoubleArray((float[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_FLOAT32_ARRAY.id(), typedArgs));
+	}
+
+	protected static double[] callStaticPackedFloat64Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return (double[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_FLOAT64_ARRAY.id(), typedArgs);
+	}
+
+	protected static String[] callStaticPackedStringArray(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return (String[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_STRING_ARRAY.id(), typedArgs);
+	}
+
+	protected static double[][] callStaticPackedVector2Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return vector2ArrayToDoubleArray((Vector2[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_VECTOR2_ARRAY.id(), typedArgs));
+	}
+
+	protected static double[][] callStaticPackedVector3Array(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return vector3ArrayToDoubleArray((Vector3[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_VECTOR3_ARRAY.id(), typedArgs));
+	}
+
+	protected static double[][] callStaticPackedColorArray(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return colorArrayToDoubleArray((Color[]) callStaticTypedBuiltinObject(className, methodName, hash, 16,
+				VariantType.PACKED_COLOR_ARRAY.id(), typedArgs));
 	}
 
 	protected static float callStaticFloat32(String className, String methodName, long hash, Object... typedArgs) {
@@ -259,71 +603,495 @@ public abstract class Godot {
 	private <T> T callEnginePtr(String className, String methodName, long hash, long returnSize,
 			Function<MemorySegment, T> reader, Object... typedArgs) {
 		checkValid();
-		return callMethodBindPtr(className, methodName, hash, MemorySegment.ofAddress(nativeObject), returnSize, reader,
-				typedArgs);
+		return callEnginePtr(className, methodName, hash, returnSize, -1, reader, typedArgs);
+	}
+
+	private <T> T callEnginePtr(String className, String methodName, long hash, long returnSize, int returnVariantType,
+			Function<MemorySegment, T> reader, Object... typedArgs) {
+		checkValid();
+		return callMethodBindPtr(className, methodName, hash, MemorySegment.ofAddress(nativeObject), returnSize,
+				returnVariantType, reader, typedArgs);
+	}
+
+	private Object callEngineTypedBuiltinObject(String className, String methodName, long hash, long returnSize,
+			int returnVariantType, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, returnSize, returnVariantType,
+				ret -> readTypedBuiltinAsObject(ret, returnVariantType), typedArgs);
 	}
 
 	private static <T> T callStaticPtr(String className, String methodName, long hash, long returnSize,
 			Function<MemorySegment, T> reader, Object... typedArgs) {
-		return callMethodBindPtr(className, methodName, hash, MemorySegment.NULL, returnSize, reader, typedArgs);
+		return callStaticPtr(className, methodName, hash, returnSize, -1, reader, typedArgs);
+	}
+
+	private static <T> T callStaticPtr(String className, String methodName, long hash, long returnSize,
+			int returnVariantType, Function<MemorySegment, T> reader, Object... typedArgs) {
+		return callMethodBindPtr(className, methodName, hash, MemorySegment.NULL, returnSize, returnVariantType, reader,
+				typedArgs);
+	}
+
+	private static Object callStaticTypedBuiltinObject(String className, String methodName, long hash, long returnSize,
+			int returnVariantType, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, returnSize, returnVariantType,
+				ret -> readTypedBuiltinAsObject(ret, returnVariantType), typedArgs);
 	}
 
 	private static <T> T callMethodBindPtr(String className, String methodName, long hash, MemorySegment object,
-			long returnSize, Function<MemorySegment, T> reader, Object... typedArgs) {
+			long returnSize, int returnVariantType, Function<MemorySegment, T> reader, Object... typedArgs) {
 		return Bridge.runDowncall(() -> Bridge.runScoped(() -> {
 			MemorySegment methodBind = getCachedMethodBind(className, methodName, hash);
 			if (methodBind.address() == 0) {
 				throw new RuntimeException("Method bind not found: " + methodName + " on " + className);
 			}
 
-			MemorySegment argPtrs = typedArgPtrs(typedArgs);
+			TypedArgFrame args = typedArgFrame(typedArgs);
 			MemorySegment ret = Bridge.allocate(returnSize);
-			Bridge.callVoid(ApiIndex.OBJECT_METHOD_BIND_PTRCALL, methodBind, object, argPtrs, ret);
-			return reader.apply(ret);
+			try {
+				Bridge.callVoid(ApiIndex.OBJECT_METHOD_BIND_PTRCALL, methodBind, object, args.argPtrs(), ret);
+				return reader.apply(ret);
+			} finally {
+				destroyTypedBuiltin(ret, returnVariantType);
+				args.destroy();
+			}
 		}));
 	}
 
-	private static MemorySegment typedArgPtrs(Object[] typedArgs) {
-		int argc = typedArgs != null ? typedArgs.length : 0;
-		if (argc == 0) {
-			return MemorySegment.NULL;
-		}
-		MemorySegment argPtrs = Bridge.allocate((long) argc * ADDRESS.byteSize());
-		for (int i = 0; i < argc; i++) {
-			MemorySegment slot = typedArgSlot(typedArgs[i]);
-			argPtrs.set(ADDRESS, (long) i * ADDRESS.byteSize(), slot);
-		}
-		return argPtrs;
+	private static void callMethodBindPtrVoid(String className, String methodName, long hash, MemorySegment object,
+			Object... typedArgs) {
+		Bridge.runDowncall(() -> Bridge.runScoped(() -> {
+			MemorySegment methodBind = getCachedMethodBind(className, methodName, hash);
+			if (methodBind.address() == 0) {
+				throw new RuntimeException("Method bind not found: " + methodName + " on " + className);
+			}
+
+			TypedArgFrame args = typedArgFrame(typedArgs);
+			try {
+				Bridge.callVoid(ApiIndex.OBJECT_METHOD_BIND_PTRCALL, methodBind, object, args.argPtrs(),
+						MemorySegment.NULL);
+				return null;
+			} finally {
+				args.destroy();
+			}
+		}));
 	}
 
-	private static MemorySegment typedArgSlot(Object value) {
+	protected static Object typedStringArg(String value) {
+		return new TypedStringArg(value);
+	}
+
+	protected static Object typedStringNameArg(String value) {
+		return new TypedStringNameArg(value);
+	}
+
+	protected static Object typedNodePathArg(String value) {
+		return new TypedNodePathArg(value);
+	}
+
+	protected static Object typedObjectArg(Godot value, boolean refCounted) {
+		return new TypedObjectArg(value, refCounted);
+	}
+
+	protected static Object typedVariantArg(Object value) {
+		return new TypedVariantArg(value);
+	}
+
+	protected static Object typedArrayArg(GodotArray value) {
+		return new TypedBuiltinArg(value, VariantType.ARRAY.id(), 8);
+	}
+
+	protected static Object typedDictionaryArg(GodotDictionary value) {
+		return new TypedBuiltinArg(value, VariantType.DICTIONARY.id(), 8);
+	}
+
+	protected static Object typedCallableArg(Callable value) {
+		return new TypedBuiltinArg(value, VariantType.CALLABLE.id(), 16);
+	}
+
+	protected static Object typedSignalArg(Signal value) {
+		return new TypedBuiltinArg(value, VariantType.SIGNAL.id(), 16);
+	}
+
+	private static TypedArgFrame typedArgFrame(Object[] typedArgs) {
+		int argc = typedArgs != null ? typedArgs.length : 0;
+		if (argc == 0) {
+			return TypedArgFrame.EMPTY;
+		}
+		MemorySegment argPtrs = Bridge.allocate((long) argc * ADDRESS.byteSize());
+		NativeTypedArg[] nativeArgs = new NativeTypedArg[argc];
+		for (int i = 0; i < argc; i++) {
+			NativeTypedArg nativeArg = typedArgSlot(typedArgs[i]);
+			nativeArgs[i] = nativeArg;
+			argPtrs.set(ADDRESS, (long) i * ADDRESS.byteSize(), nativeArg.segment());
+		}
+		return new TypedArgFrame(argPtrs, nativeArgs);
+	}
+
+	private static NativeTypedArg typedArgSlot(Object value) {
 		if (value instanceof Boolean b) {
 			MemorySegment slot = Bridge.allocate(1);
 			slot.set(JAVA_BYTE, 0, b ? (byte) 1 : (byte) 0);
-			return slot;
+			return NativeTypedArg.primitive(slot);
 		}
 		if (value instanceof Float f) {
 			MemorySegment slot = Bridge.allocate(4);
 			slot.set(JAVA_FLOAT, 0, f);
-			return slot;
+			return NativeTypedArg.primitive(slot);
 		}
 		if (value instanceof Double d) {
 			MemorySegment slot = Bridge.allocate(8);
 			slot.set(JAVA_DOUBLE, 0, d);
-			return slot;
+			return NativeTypedArg.primitive(slot);
 		}
 		if (value instanceof Byte || value instanceof Short || value instanceof Integer) {
 			MemorySegment slot = Bridge.allocate(4);
 			slot.set(JAVA_INT, 0, ((Number) value).intValue());
-			return slot;
+			return NativeTypedArg.primitive(slot);
 		}
 		if (value instanceof Long l) {
 			MemorySegment slot = Bridge.allocate(8);
 			slot.set(JAVA_LONG, 0, l);
-			return slot;
+			return NativeTypedArg.primitive(slot);
+		}
+		if (value instanceof BigInteger i) {
+			MemorySegment slot = Bridge.allocate(8);
+			slot.set(JAVA_LONG, 0, i.longValue());
+			return NativeTypedArg.primitive(slot);
+		}
+		if (value instanceof TypedStringArg s) {
+			return new NativeTypedArg(GodotString.fromJavaString(s.value()).segment(), VariantType.STRING.id());
+		}
+		if (value instanceof TypedStringNameArg s) {
+			return new NativeTypedArg(GodotStringName.fromJavaStringUncached(s.value()).segment(),
+					VariantType.STRING_NAME.id());
+		}
+		if (value instanceof TypedNodePathArg s) {
+			return new NativeTypedArg(constructBuiltinFromString(VariantType.NODE_PATH.id(), s.value()),
+					VariantType.NODE_PATH.id());
+		}
+		if (value instanceof TypedObjectArg objectArg) {
+			return typedObjectArgSlot(objectArg);
+		}
+		if (value instanceof TypedVariantArg variantArg) {
+			MemorySegment slot = Bridge.allocVariant();
+			VariantUtils.fromObjectInto(variantArg.value(), slot);
+			return new NativeTypedArg(slot, VARIANT_SENTINEL);
+		}
+		if (value instanceof TypedBuiltinArg builtinArg) {
+			return typedBuiltinArgSlot(builtinArg);
+		}
+		MemorySegment builtinSlot = typedBuiltinStructArgSlot(value);
+		if (builtinSlot != null) {
+			return NativeTypedArg.primitive(builtinSlot);
 		}
 		throw new IllegalArgumentException(
 				"Unsupported typed ptrcall argument: " + (value == null ? "null" : value.getClass().getName()));
+	}
+
+	private static MemorySegment typedBuiltinStructArgSlot(Object value) {
+		if (value instanceof Vector2 v)
+			return writeBuiltinStruct(16, v::toSegment);
+		if (value instanceof Vector2i v)
+			return writeBuiltinStruct(8, v::toSegment);
+		if (value instanceof Rect2 v)
+			return writeBuiltinStruct(32, v::toSegment);
+		if (value instanceof Rect2i v)
+			return writeBuiltinStruct(16, v::toSegment);
+		if (value instanceof Vector3 v)
+			return writeBuiltinStruct(24, v::toSegment);
+		if (value instanceof Vector3i v)
+			return writeBuiltinStruct(12, v::toSegment);
+		if (value instanceof Transform2D v)
+			return writeBuiltinStruct(48, v::toSegment);
+		if (value instanceof Vector4 v)
+			return writeBuiltinStruct(32, v::toSegment);
+		if (value instanceof Vector4i v)
+			return writeBuiltinStruct(16, v::toSegment);
+		if (value instanceof Plane v)
+			return writeBuiltinStruct(32, v::toSegment);
+		if (value instanceof Quaternion v)
+			return writeBuiltinStruct(32, v::toSegment);
+		if (value instanceof AABB v)
+			return writeBuiltinStruct(48, v::toSegment);
+		if (value instanceof Basis v)
+			return writeBuiltinStruct(72, v::toSegment);
+		if (value instanceof Transform3D v)
+			return writeBuiltinStruct(96, v::toSegment);
+		if (value instanceof Projection v)
+			return writeBuiltinStruct(64, v::toSegment);
+		if (value instanceof Color v)
+			return writeBuiltinStruct(16, v::toSegment);
+		return null;
+	}
+
+	private static NativeTypedArg typedBuiltinArgSlot(TypedBuiltinArg arg) {
+		MemorySegment variant = Bridge.allocVariant();
+		MemorySegment slot = Bridge.allocate(arg.size());
+		try {
+			VariantUtils.fromObjectInto(arg.value(), variant);
+			MethodHandle extractor = Variant.getTypeExtractor(arg.variantType());
+			if (extractor == null) {
+				throw new IllegalStateException("No Variant extractor for builtin type " + arg.variantType());
+			}
+			extractor.invoke(slot, variant);
+			return new NativeTypedArg(slot, arg.variantType());
+		} catch (Throwable t) {
+			throw new RuntimeException("Failed to build typed builtin argument for type " + arg.variantType(), t);
+		} finally {
+			Bridge.destroyVariant(variant);
+		}
+	}
+
+	private static NativeTypedArg typedObjectArgSlot(TypedObjectArg arg) {
+		if (arg.value() == null || arg.value().getPtr() == 0) {
+			MemorySegment slot = Bridge.allocate(ADDRESS.byteSize());
+			slot.set(ADDRESS, 0, MemorySegment.NULL);
+			return NativeTypedArg.primitive(slot);
+		}
+		MemorySegment object = MemorySegment.ofAddress(arg.value().getPtr());
+		if (arg.refCounted()) {
+			MemorySegment slot = Bridge.allocate(8);
+			Bridge.callVoid(ApiIndex.REF_SET_OBJECT, slot, object);
+			return new NativeTypedArg(slot, REF_PTR_SENTINEL);
+		}
+		MemorySegment slot = Bridge.allocate(ADDRESS.byteSize());
+		slot.set(ADDRESS, 0, object);
+		return NativeTypedArg.primitive(slot);
+	}
+
+	private static MemorySegment writeBuiltinStruct(long size, java.util.function.Consumer<MemorySegment> writer) {
+		MemorySegment slot = Bridge.allocate(size);
+		writer.accept(slot);
+		return slot;
+	}
+
+	private static String readTypedBuiltinAsString(MemorySegment value, int variantType) {
+		try {
+			if (variantType == VariantType.STRING.id()) {
+				return new GodotString(value).toJavaString();
+			}
+			MemorySegment variant = Bridge.allocVariant();
+			MethodHandle ctor = Variant.getTypeConstructor(variantType);
+			if (ctor == null) {
+				throw new IllegalStateException("No Variant constructor for builtin type " + variantType);
+			}
+			ctor.invoke(variant, value);
+			try {
+				MemorySegment outString = Bridge.allocate(16);
+				Bridge.callVoid(ApiIndex.VARIANT_STRINGIFY, variant, outString);
+				return new GodotString(outString).toJavaString();
+			} finally {
+				Bridge.destroyVariant(variant);
+			}
+		} catch (Throwable t) {
+			throw new RuntimeException("Failed to read typed builtin as String", t);
+		}
+	}
+
+	private static BigInteger unsignedLongToBigInteger(long value) {
+		return new BigInteger(Long.toUnsignedString(value));
+	}
+
+	private static Object readTypedBuiltinAsObject(MemorySegment value, int variantType) {
+		try {
+			MemorySegment variant = Bridge.allocVariant();
+			MethodHandle ctor = Variant.getTypeConstructor(variantType);
+			if (ctor == null) {
+				throw new IllegalStateException("No Variant constructor for builtin type " + variantType);
+			}
+			ctor.invoke(variant, value);
+			try {
+				return VariantUtils.toObject(new Variant(variant));
+			} finally {
+				Bridge.destroyVariant(variant);
+			}
+		} catch (Throwable t) {
+			throw new RuntimeException("Failed to read typed builtin as Object", t);
+		}
+	}
+
+	private static double[] floatArrayToDoubleArray(float[] values) {
+		double[] result = new double[values.length];
+		for (int i = 0; i < values.length; i++) {
+			result[i] = values[i];
+		}
+		return result;
+	}
+
+	private static double[][] vector2ArrayToDoubleArray(Vector2[] values) {
+		double[][] result = new double[values.length][2];
+		for (int i = 0; i < values.length; i++) {
+			result[i][0] = values[i].x;
+			result[i][1] = values[i].y;
+		}
+		return result;
+	}
+
+	private static double[][] vector3ArrayToDoubleArray(Vector3[] values) {
+		double[][] result = new double[values.length][3];
+		for (int i = 0; i < values.length; i++) {
+			result[i][0] = values[i].x;
+			result[i][1] = values[i].y;
+			result[i][2] = values[i].z;
+		}
+		return result;
+	}
+
+	private static double[][] colorArrayToDoubleArray(Color[] values) {
+		double[][] result = new double[values.length][4];
+		for (int i = 0; i < values.length; i++) {
+			result[i][0] = values[i].r;
+			result[i][1] = values[i].g;
+			result[i][2] = values[i].b;
+			result[i][3] = values[i].a;
+		}
+		return result;
+	}
+
+	private static long readTypedObjectPointer(MemorySegment ret, boolean refCountedReturn) {
+		if (refCountedReturn) {
+			MemorySegment object = Bridge.callPtr(ApiIndex.REF_GET_OBJECT, ret);
+			return object.address();
+		}
+		return ret.get(ADDRESS, 0).address();
+	}
+
+	@SuppressWarnings("unchecked")
+	private static <T extends Godot> T wrapTypedObject(long ptr, String expectedClassName, boolean refCounted) {
+		if (ptr == 0) {
+			return null;
+		}
+		Godot existing = org.godot.internal.ref.JavaObjectMap.get(ptr);
+		if (existing != null) {
+			return (T) existing;
+		}
+		Godot created = org.godot.internal.GodotClassRegistry.create(expectedClassName, ptr);
+		if (created == null) {
+			created = org.godot.internal.GodotClassRegistry.createTypedWrapper(ptr);
+		}
+		if (created == null) {
+			created = new org.godot.internal.ref.GenericGodotObject(ptr, expectedClassName);
+		}
+		org.godot.internal.ref.JavaObjectMap.put(ptr, created);
+		if (refCounted) {
+			org.godot.internal.ref.RefCountedHelper.reference(ptr);
+		}
+		return (T) created;
+	}
+
+	private static MemorySegment constructBuiltinFromString(int variantType, String value) {
+		GodotString string = GodotString.fromJavaString(value);
+		MemorySegment result = Bridge.allocate(8);
+		MemorySegment args = Bridge.allocate(ADDRESS.byteSize());
+		args.set(ADDRESS, 0, string.segment());
+		invokeBuiltinConstructor(variantType, 2, result, args);
+		destroyTypedBuiltin(string.segment(), VariantType.STRING.id());
+		return result;
+	}
+
+	private static void invokeBuiltinConstructor(int variantType, int constructor, MemorySegment result,
+			MemorySegment args) {
+		try {
+			getBuiltinConstructor(variantType, constructor).invoke(result, args);
+		} catch (Throwable t) {
+			throw new RuntimeException("Builtin constructor failed for type " + variantType, t);
+		}
+	}
+
+	private static MethodHandle getBuiltinConstructor(int variantType, int constructor) {
+		String key = variantType + ":" + constructor;
+		return BUILTIN_CONSTRUCTOR_CACHE.computeIfAbsent(key, ignored -> {
+			try {
+				MemorySegment ptr = Bridge.callPtr(ApiIndex.VARIANT_GET_PTR_CONSTRUCTOR, variantType, constructor);
+				if (ptr.address() == 0) {
+					throw new IllegalStateException(
+							"No builtin constructor for type " + variantType + " index " + constructor);
+				}
+				return Linker.nativeLinker().downcallHandle(ptr, BUILTIN_CONSTRUCTOR_DESC);
+			} catch (Throwable t) {
+				throw new RuntimeException("Failed to load builtin constructor for type " + variantType, t);
+			}
+		});
+	}
+
+	private static void destroyTypedBuiltin(MemorySegment value, int variantType) {
+		if (variantType == VARIANT_SENTINEL) {
+			Bridge.destroyVariant(value);
+			return;
+		}
+		if (variantType < 0 || value == null || value.address() == 0) {
+			return;
+		}
+		try {
+			getBuiltinDestructor(variantType).invoke(value);
+		} catch (Throwable t) {
+			logger.warn("Failed to destroy typed builtin type {}: {}", variantType, t.getMessage());
+		}
+	}
+
+	private static MethodHandle getBuiltinDestructor(int variantType) {
+		return BUILTIN_DESTRUCTOR_CACHE.computeIfAbsent(variantType, ignored -> {
+			try {
+				MemorySegment ptr = Bridge.callPtr(ApiIndex.VARIANT_GET_PTR_DESTRUCTOR, variantType);
+				if (ptr.address() == 0) {
+					throw new IllegalStateException("No builtin destructor for type " + variantType);
+				}
+				return Linker.nativeLinker().downcallHandle(ptr, BUILTIN_DESTRUCTOR_DESC);
+			} catch (Throwable t) {
+				throw new RuntimeException("Failed to load builtin destructor for type " + variantType, t);
+			}
+		});
+	}
+
+	private record TypedStringArg(String value) {
+	}
+
+	private record TypedStringNameArg(String value) {
+	}
+
+	private record TypedNodePathArg(String value) {
+	}
+
+	private record TypedObjectArg(Godot value, boolean refCounted) {
+	}
+
+	private static final int REF_PTR_SENTINEL = -2;
+	private static final int VARIANT_SENTINEL = -3;
+
+	private record NativeTypedArg(MemorySegment segment, int destroyVariantType) {
+		static NativeTypedArg primitive(MemorySegment segment) {
+			return new NativeTypedArg(segment, -1);
+		}
+
+		void destroy() {
+			if (destroyVariantType == REF_PTR_SENTINEL) {
+				try {
+					Bridge.callVoid(ApiIndex.REF_SET_OBJECT, segment, MemorySegment.NULL);
+				} catch (RuntimeException ignored) {
+				}
+				return;
+			}
+			if (destroyVariantType == VARIANT_SENTINEL) {
+				Bridge.destroyVariant(segment);
+				return;
+			}
+			destroyTypedBuiltin(segment, destroyVariantType);
+		}
+	}
+
+	private record TypedVariantArg(Object value) {
+	}
+
+	private record TypedBuiltinArg(Object value, int variantType, long size) {
+	}
+
+	private record TypedArgFrame(MemorySegment argPtrs, NativeTypedArg[] args) {
+		static final TypedArgFrame EMPTY = new TypedArgFrame(MemorySegment.NULL, new NativeTypedArg[0]);
+
+		void destroy() {
+			for (NativeTypedArg arg : args) {
+				arg.destroy();
+			}
+		}
 	}
 
 	private static java.lang.Object callMethodBind(String className, String methodName, long hash, MemorySegment object,

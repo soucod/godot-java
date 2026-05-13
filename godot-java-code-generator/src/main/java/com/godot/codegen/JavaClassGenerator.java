@@ -30,6 +30,7 @@ public class JavaClassGenerator {
 		for (ClassInfo cls : classes) {
 			classMap.put(cls.name(), cls);
 		}
+		TypedCallSupport.configure(classMap);
 	}
 
 	public JavaFile generateClass(ClassInfo classInfo) {
@@ -402,33 +403,49 @@ public class JavaClassGenerator {
 				methodBuilder.addModifiers(Modifier.PUBLIC, Modifier.STATIC);
 				if (!returnType.equals("void")) {
 					methodBuilder.returns(toTypeName(returnType));
-					String typedHelper = typedReturnHelper(method, true);
-					if (typedHelper != null && typedArgumentsSupported(method)) {
-						methodBuilder.addStatement("return $L($S, $S, $L$L)", typedHelper, classInfo.name(),
-								method.name(), method.hash() + "L", typedCallArgs(method, paramNames));
+					String typedHelper = TypedCallSupport.helperName(method, true);
+					if (typedHelper != null && TypedCallSupport.argumentsSupported(method)) {
+						methodBuilder.addStatement("return $L($S, $S, $L$L$L)", typedHelper, classInfo.name(),
+								method.name(), method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
+								TypedCallSupport.callArgs(method, paramNames));
 					} else {
 						methodBuilder.addStatement("return ($T) callStatic($S, $S, $L$L)", toTypeName(returnType),
 								classInfo.name(), method.name(), method.hash() + "L", callArgs);
 					}
 				} else {
-					methodBuilder.addStatement("callStatic($S, $S, $L$L)", classInfo.name(), method.name(),
-							method.hash() + "L", callArgs);
+					String typedHelper = TypedCallSupport.helperName(method, true);
+					if (typedHelper != null && TypedCallSupport.argumentsSupported(method)) {
+						methodBuilder.addStatement("$L($S, $S, $L$L$L)", typedHelper, classInfo.name(), method.name(),
+								method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
+								TypedCallSupport.callArgs(method, paramNames));
+					} else {
+						methodBuilder.addStatement("callStatic($S, $S, $L$L)", classInfo.name(), method.name(),
+								method.hash() + "L", callArgs);
+					}
 				}
 			} else {
 				methodBuilder.addModifiers(Modifier.PUBLIC);
 				if (!returnType.equals("void")) {
 					methodBuilder.returns(toTypeName(returnType));
-					String typedHelper = typedReturnHelper(method, false);
-					if (typedHelper != null && typedArgumentsSupported(method)) {
-						methodBuilder.addStatement("return $L($S, $S, $L$L)", typedHelper, classInfo.name(),
-								method.name(), method.hash() + "L", typedCallArgs(method, paramNames));
+					String typedHelper = TypedCallSupport.helperName(method, false);
+					if (typedHelper != null && TypedCallSupport.argumentsSupported(method)) {
+						methodBuilder.addStatement("return $L($S, $S, $L$L$L)", typedHelper, classInfo.name(),
+								method.name(), method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
+								TypedCallSupport.callArgs(method, paramNames));
 					} else {
 						methodBuilder.addStatement("return ($T) callEngine($S, $S, $L$L)", toTypeName(returnType),
 								classInfo.name(), method.name(), method.hash() + "L", callArgs);
 					}
 				} else {
-					methodBuilder.addStatement("callEngine($S, $S, $L$L)", classInfo.name(), method.name(),
-							method.hash() + "L", callArgs);
+					String typedHelper = TypedCallSupport.helperName(method, false);
+					if (typedHelper != null && TypedCallSupport.argumentsSupported(method)) {
+						methodBuilder.addStatement("$L($S, $S, $L$L$L)", typedHelper, classInfo.name(), method.name(),
+								method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
+								TypedCallSupport.callArgs(method, paramNames));
+					} else {
+						methodBuilder.addStatement("callEngine($S, $S, $L$L)", classInfo.name(), method.name(),
+								method.hash() + "L", callArgs);
+					}
 				}
 			}
 
@@ -545,78 +562,6 @@ public class JavaClassGenerator {
 		};
 	}
 
-	private String typedReturnHelper(MethodInfo method, boolean isStatic) {
-		String prefix = isStatic ? "callStatic" : "callEngine";
-		String type = method.returnType();
-		String meta = method.returnMeta();
-		if ("bool".equals(type)) {
-			return prefix + "Bool";
-		}
-		if ("int".equals(type)) {
-			if ("int32".equals(meta)) {
-				return prefix + "Int32";
-			}
-			if (meta == null || meta.isEmpty() || "int64".equals(meta)) {
-				return prefix + "Int64";
-			}
-		}
-		if ("float".equals(type)) {
-			if ("float".equals(meta) || "float32".equals(meta)) {
-				return prefix + "Float32";
-			}
-			if (meta == null || meta.isEmpty() || "double".equals(meta) || "float64".equals(meta)) {
-				return prefix + "Float64";
-			}
-		}
-		return null;
-	}
-
-	private boolean typedArgumentsSupported(MethodInfo method) {
-		for (ArgInfo arg : method.arguments()) {
-			if (typedArgExpression(arg, "unused") == null) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	private String typedCallArgs(MethodInfo method, List<String> paramNames) {
-		if (method.arguments().isEmpty()) {
-			return "";
-		}
-		StringBuilder args = new StringBuilder();
-		for (int i = 0; i < method.arguments().size(); i++) {
-			args.append(", ");
-			args.append(typedArgExpression(method.arguments().get(i), paramNames.get(i)));
-		}
-		return args.toString();
-	}
-
-	private String typedArgExpression(ArgInfo arg, String paramName) {
-		String type = arg.type();
-		String meta = arg.meta();
-		if ("bool".equals(type)) {
-			return "java.lang.Boolean.valueOf(" + paramName + ")";
-		}
-		if ("int".equals(type)) {
-			if ("int32".equals(meta)) {
-				return "java.lang.Integer.valueOf((int) " + paramName + ")";
-			}
-			if (meta == null || meta.isEmpty() || "int64".equals(meta)) {
-				return "java.lang.Long.valueOf(" + paramName + ")";
-			}
-		}
-		if ("float".equals(type)) {
-			if ("float".equals(meta) || "float32".equals(meta)) {
-				return "java.lang.Float.valueOf((float) " + paramName + ")";
-			}
-			if (meta == null || meta.isEmpty() || "double".equals(meta) || "float64".equals(meta)) {
-				return "java.lang.Double.valueOf(" + paramName + ")";
-			}
-		}
-		return null;
-	}
-
 	private String defaultValueToJava(ArgInfo arg, String javaType) {
 		String dv = arg.defaultValue();
 		if (dv == null) {
@@ -718,7 +663,7 @@ public class JavaClassGenerator {
 		return result;
 	}
 
-	private record MethodBindRef(String className, long hash) {
+	private record MethodBindRef(String className, long hash, MethodInfo method) {
 	}
 
 	private MethodBindRef findMethodBind(ClassInfo classInfo, String methodName) {
@@ -729,12 +674,12 @@ public class JavaClassGenerator {
 				break;
 			for (MethodInfo method : current.methods()) {
 				if (method.name().equals(methodName)) {
-					return new MethodBindRef(current.name(), method.hash());
+					return new MethodBindRef(current.name(), method.hash(), method);
 				}
 			}
 			currentName = current.inherits();
 		}
-		return new MethodBindRef(classInfo.name(), 0L);
+		return new MethodBindRef(classInfo.name(), 0L, null);
 	}
 
 	/**
@@ -768,11 +713,20 @@ public class JavaClassGenerator {
 			}
 
 			MethodBindRef getterBind = findMethodBind(classInfo, getterMethod);
-			MethodSpec getterSpec = MethodSpec.methodBuilder(getterName).addModifiers(Modifier.PUBLIC)
-					.returns(toTypeName(javaType))
-					.addStatement("return ($T) callEngine($S, $S, $LL, new java.lang.Object[0])", toTypeName(javaType),
-							getterBind.className(), getterMethod, getterBind.hash())
-					.build();
+			MethodSpec.Builder getterBuilder = MethodSpec.methodBuilder(getterName).addModifiers(Modifier.PUBLIC)
+					.returns(toTypeName(javaType));
+			String typedGetter = getterBind.method() != null
+					? TypedCallSupport.helperName(getterBind.method(), false)
+					: null;
+			if (typedGetter != null
+					&& TypedCallSupport.propertyGetterFallbackReason(getterBind.method(), javaType) == null) {
+				getterBuilder.addStatement("return $L($S, $S, $LL$L)", typedGetter, getterBind.className(),
+						getterMethod, getterBind.hash(), TypedCallSupport.returnMetadataArgs(getterBind.method()));
+			} else {
+				getterBuilder.addStatement("return ($T) callEngine($S, $S, $LL, new java.lang.Object[0])",
+						toTypeName(javaType), getterBind.className(), getterMethod, getterBind.hash());
+			}
+			MethodSpec getterSpec = getterBuilder.build();
 			builder.addMethod(getterSpec);
 
 			// Determine setter method name
@@ -784,11 +738,21 @@ public class JavaClassGenerator {
 			String setterName = "set" + capitalize(javaPropName);
 
 			MethodBindRef setterBind = findMethodBind(classInfo, setterMethod);
-			MethodSpec setterSpec = MethodSpec.methodBuilder(setterName).addModifiers(Modifier.PUBLIC)
-					.addParameter(toTypeName(javaType), "value")
-					.addStatement("callEngine($S, $S, $LL, new java.lang.Object[] { " + boxToObject("value", javaType)
-							+ " })", setterBind.className(), setterMethod, setterBind.hash())
-					.build();
+			MethodSpec.Builder setterBuilder = MethodSpec.methodBuilder(setterName).addModifiers(Modifier.PUBLIC)
+					.addParameter(toTypeName(javaType), "value");
+			String typedSetter = setterBind.method() != null
+					? TypedCallSupport.helperName(setterBind.method(), false)
+					: null;
+			if (typedSetter != null
+					&& TypedCallSupport.propertySetterFallbackReason(setterBind.method(), javaType) == null) {
+				setterBuilder.addStatement("$L($S, $S, $LL$L)", typedSetter, setterBind.className(), setterMethod,
+						setterBind.hash(), TypedCallSupport.callArgs(setterBind.method(), List.of("value")));
+			} else {
+				setterBuilder.addStatement(
+						"callEngine($S, $S, $LL, new java.lang.Object[] { " + boxToObject("value", javaType) + " })",
+						setterBind.className(), setterMethod, setterBind.hash());
+			}
+			MethodSpec setterSpec = setterBuilder.build();
 			builder.addMethod(setterSpec);
 		}
 	}

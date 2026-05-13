@@ -30,17 +30,184 @@ class JavaClassGeneratorTypedCallTest {
 	@Test
 	void unsupportedArgKeepsDynamicCallPath() {
 		String source = generateSource(new MethodInfo("intersects", true, false, false, false, 2L,
-				List.of(new ArgInfo("position", "Vector2", null, null)), "bool", null));
+				List.of(new ArgInfo("values", "PackedStringArray", null, null)), "bool", null));
 
 		assertTrue(source.contains("return (boolean) callEngine(\"TestNode\", \"intersects\", 2L"), source);
 	}
 
 	@Test
-	void unsupportedReturnKeepsDynamicCallPath() {
+	void stringReturnUsesTypedPtrcallHelper() {
 		String source = generateSource(
 				new MethodInfo("get_name", true, false, false, false, 4L, List.of(), "String", null));
 
-		assertTrue(source.contains("return (String) callEngine(\"TestNode\", \"get_name\", 4L);"), source);
+		assertTrue(source.contains("return callEngineString(\"TestNode\", \"get_name\", 4L);"), source);
+	}
+
+	@Test
+	void stringArgUsesTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("set_name", false, false, false, false, 12L,
+				List.of(new ArgInfo("name", "String", null, null)), null, null));
+
+		assertTrue(source.contains("callEngineVoid(\"TestNode\", \"set_name\", 12L, typedStringArg(name));"), source);
+	}
+
+	@Test
+	void stringNameUsesTypeSpecificTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("has_method", true, false, false, false, 13L,
+				List.of(new ArgInfo("method", "StringName", null, null)), "bool", null));
+
+		assertTrue(source.contains("public boolean hasMethod(String method)"), source);
+		assertTrue(
+				source.contains(
+						"return callEngineBool(\"TestNode\", \"has_method\", 13L, typedStringNameArg(method));"),
+				source);
+	}
+
+	@Test
+	void nodePathUsesTypeSpecificTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("get_node", true, false, false, false, 14L,
+				List.of(new ArgInfo("path", "NodePath", null, null)), "NodePath", null));
+
+		assertTrue(source.contains("public String getNode(String path)"), source);
+		assertTrue(
+				source.contains("return callEngineNodePath(\"TestNode\", \"get_node\", 14L, typedNodePathArg(path));"),
+				source);
+	}
+
+	@Test
+	void enumReturnAndArgUseInt32TypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("set_error", true, false, false, false, 15L,
+				List.of(new ArgInfo("error", "enum::Error", null, null)), "enum::Error", null));
+
+		assertTrue(source.contains("public int setError(int error)"), source);
+		assertTrue(
+				source.contains(
+						"return callEngineInt32(\"TestNode\", \"set_error\", 15L, java.lang.Integer.valueOf(error));"),
+				source);
+	}
+
+	@Test
+	void uint32ReturnAndArgUseUint32TypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("set_mask", true, false, false, false, 16L,
+				List.of(new ArgInfo("mask", "int", "uint32", null)), "int", "uint32"));
+
+		assertTrue(source.contains("public long setMask(long mask)"), source);
+		assertTrue(source.contains(
+				"return callEngineUint32(\"TestNode\", \"set_mask\", 16L, java.lang.Integer.valueOf((int) mask));"),
+				source);
+	}
+
+	@Test
+	void uint64ReturnAndArgUseUint64TypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("set_large_mask", true, false, false, false, 18L,
+				List.of(new ArgInfo("mask", "int", "uint64", null)), "int", "uint64"));
+
+		assertTrue(source.contains("public java.math.BigInteger setLargeMask(long mask)"), source);
+		assertTrue(source.contains(
+				"return callEngineUint64(\"TestNode\", \"set_large_mask\", 18L, java.lang.Long.valueOf(mask));"),
+				source);
+	}
+
+	@Test
+	void builtinStructReturnAndArgUseTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("move_local", true, false, false, false, 17L,
+				List.of(new ArgInfo("offset", "Vector2", null, null)), "Vector2", null));
+
+		assertTrue(source.contains("public Vector2 moveLocal(Vector2 offset)"), source);
+		assertTrue(source.contains("return callEngineVector2(\"TestNode\", \"move_local\", 17L, offset);"), source);
+	}
+
+	@Test
+	void projectionReturnAndArgUseTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("set_projection", true, false, false, false, 21L,
+				List.of(new ArgInfo("projection", "Projection", null, null)), "Projection", null));
+
+		assertTrue(source.contains("public Projection setProjection(Projection projection)"), source);
+		assertTrue(source.contains("return callEngineProjection(\"TestNode\", \"set_projection\", 21L, projection);"),
+				source);
+	}
+
+	@Test
+	void callableAndSignalArgsUseTypedBuiltinArgs() {
+		String source = generateSource(new MethodInfo("connect_signal", false, false, false, false, 22L,
+				List.of(new ArgInfo("signal", "Signal", null, null), new ArgInfo("callable", "Callable", null, null)),
+				null, null));
+
+		assertTrue(source.contains("public void connectSignal(Signal signal, Callable callable)"), source);
+		assertTrue(source.contains(
+				"callEngineVoid(\"TestNode\", \"connect_signal\", 22L, typedSignalArg(signal), typedCallableArg(callable));"),
+				source);
+	}
+
+	@Test
+	void arrayAndDictionaryArgsUseTypedBuiltinArgs() {
+		String source = generateSource(new MethodInfo("merge_values", false, false, false, false, 26L,
+				List.of(new ArgInfo("values", "Array", null, null), new ArgInfo("options", "Dictionary", null, null)),
+				null, null));
+
+		assertTrue(source.contains("public void mergeValues(GodotArray values, GodotDictionary options)"), source);
+		assertTrue(source.contains(
+				"callEngineVoid(\"TestNode\", \"merge_values\", 26L, typedArrayArg(values), typedDictionaryArg(options));"),
+				source);
+	}
+
+	@Test
+	void engineObjectReturnAndArgUseTypedPtrcallHelper() {
+		ClassInfo texture = new ClassInfo("Texture2D", "Resource", true, false, "core", List.of(), List.of(), List.of(),
+				List.of());
+		ClassInfo classInfo = new ClassInfo("TestNode", null, false, false, "core", List.of(),
+				List.of(new MethodInfo("set_texture", true, false, false, false, 19L,
+						List.of(new ArgInfo("texture", "Texture2D", null, null)), "Texture2D", null)),
+				List.of(), List.of());
+
+		String source = new JavaClassGenerator("org.godot.node", List.of(classInfo, texture)).generateClass(classInfo)
+				.toString();
+
+		assertTrue(source.contains("public Texture2D setTexture(Texture2D texture)"), source);
+		assertTrue(source.contains(
+				"return callEngineObject(\"TestNode\", \"set_texture\", 19L, \"Texture2D\", true, typedObjectArg(texture, true));"),
+				source);
+	}
+
+	@Test
+	void variantReturnAndArgUseTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("echo_variant", true, false, false, false, 20L,
+				List.of(new ArgInfo("value", "Variant", null, null)), "Variant", null));
+
+		assertTrue(source.contains("public Object echoVariant(Object value)"), source);
+		assertTrue(
+				source.contains(
+						"return callEngineVariant(\"TestNode\", \"echo_variant\", 20L, typedVariantArg(value));"),
+				source);
+	}
+
+	@Test
+	void packedArrayReturnUsesTypedPtrcallHelperWhenArgsAreSupported() {
+		String source = generateSource(new MethodInfo("get_bytes", true, false, false, false, 23L,
+				List.of(new ArgInfo("key", "StringName", null, null)), "PackedByteArray", null));
+
+		assertTrue(source.contains("public byte[] getBytes(String key)"), source);
+		assertTrue(source.contains(
+				"return callEnginePackedByteArray(\"TestNode\", \"get_bytes\", 23L, typedStringNameArg(key));"),
+				source);
+	}
+
+	@Test
+	void packedArrayArgKeepsDynamicCallPath() {
+		String source = generateSource(new MethodInfo("set_bytes", false, false, false, false, 24L,
+				List.of(new ArgInfo("bytes", "PackedByteArray", null, null)), null, null));
+
+		assertTrue(source.contains("callEngine(\"TestNode\", \"set_bytes\", 24L"), source);
+	}
+
+	@Test
+	void packedVectorArrayReturnUsesTypedPtrcallHelperWhenArgsAreSupported() {
+		String source = generateSource(new MethodInfo("get_points", true, false, false, false, 25L, List.of(),
+				"PackedVector3Array", null));
+
+		assertTrue(source.contains("public double[][] getPoints()"), source);
+		assertTrue(source.contains("return callEnginePackedVector3Array(\"TestNode\", \"get_points\", 25L);"),
+				source);
 	}
 
 	@Test
@@ -58,6 +225,74 @@ class JavaClassGeneratorTypedCallTest {
 
 		assertTrue(source.contains("public static long maxInt()"), source);
 		assertTrue(source.contains("return callStaticInt64(\"TestNode\", \"max_int\", 5L);"), source);
+	}
+
+	@Test
+	void voidMethodWithPrimitiveArgsUsesTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("set_process", false, false, false, false, 6L,
+				List.of(new ArgInfo("enable", "bool", null, null)), null, null));
+
+		assertTrue(source.contains("public void setProcess(boolean enable)"), source);
+		assertTrue(
+				source.contains(
+						"callEngineVoid(\"TestNode\", \"set_process\", 6L, java.lang.Boolean.valueOf(enable));"),
+				source);
+	}
+
+	@Test
+	void voidMethodWithUnsupportedArgKeepsDynamicCallPath() {
+		String source = generateSource(new MethodInfo("set_position", false, false, false, false, 7L,
+				List.of(new ArgInfo("values", "PackedStringArray", null, null)), null, null));
+
+		assertTrue(source.contains("callEngine(\"TestNode\", \"set_position\", 7L"), source);
+	}
+
+	@Test
+	void ridReturnUsesTypedPtrcallHelper() {
+		String source = generateSource(
+				new MethodInfo("get_rid", true, false, false, false, 10L, List.of(), "RID", null));
+
+		assertTrue(source.contains("public long getRid()"), source);
+		assertTrue(source.contains("return callEngineRid(\"TestNode\", \"get_rid\", 10L);"), source);
+	}
+
+	@Test
+	void ridArgUsesTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("free_rid", false, false, false, false, 11L,
+				List.of(new ArgInfo("rid", "RID", null, null)), null, null));
+
+		assertTrue(source.contains("public void freeRid(long rid)"), source);
+		assertTrue(source.contains("callEngineVoid(\"TestNode\", \"free_rid\", 11L, java.lang.Long.valueOf(rid));"),
+				source);
+	}
+
+	@Test
+	void propertyGetterUsesTypedMetadataFromResolvedGetterMethod() {
+		ClassInfo classInfo = new ClassInfo("TestNode", null, false, false, "core", List.of(),
+				List.of(new MethodInfo("get_child_count", true, false, false, false, 8L, List.of(), "int", "int32")),
+				List.of(new PropertyInfo("child_count", "int", null, "get_child_count")), List.of());
+
+		String source = new JavaClassGenerator("org.godot.node", List.of(classInfo)).generateClass(classInfo)
+				.toString();
+
+		assertTrue(source.contains("public long getChildCount()"), source);
+		assertTrue(source.contains("return callEngineInt32(\"TestNode\", \"get_child_count\", 8L);"), source);
+	}
+
+	@Test
+	void propertySetterUsesTypedMetadataFromResolvedSetterMethod() {
+		ClassInfo classInfo = new ClassInfo("TestNode", null, false, false, "core", List.of(),
+				List.of(new MethodInfo("set_enabled", false, false, false, false, 9L,
+						List.of(new ArgInfo("enabled", "bool", null, null)), null, null)),
+				List.of(new PropertyInfo("enabled", "bool", "set_enabled", null)), List.of());
+
+		String source = new JavaClassGenerator("org.godot.node", List.of(classInfo)).generateClass(classInfo)
+				.toString();
+
+		assertTrue(source.contains("public void setEnabled(boolean value)"), source);
+		assertTrue(
+				source.contains("callEngineVoid(\"TestNode\", \"set_enabled\", 9L, java.lang.Boolean.valueOf(value));"),
+				source);
 	}
 
 	private String generateSource(MethodInfo method) {

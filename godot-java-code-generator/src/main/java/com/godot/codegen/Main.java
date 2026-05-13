@@ -61,6 +61,8 @@ public class Main {
 		List<ClassInfo> classes = parser.getClasses();
 		List<SingletonEntry> singletons = parser.getSingletonEntries();
 		System.out.println("Found " + classes.size() + " classes, " + singletons.size() + " singletons");
+		TypedCallCoverageReporter.print(TypedCallCoverageReporter.analyze(classes));
+		System.out.println();
 
 		Map<String, ClassInfo> classMap = new HashMap<>();
 		for (ClassInfo cls : classes) {

@@ -165,6 +165,33 @@ final class TypedCallSupport {
 		if ("Variant".equals(type)) {
 			return "typedVariantArg(" + paramName + ")";
 		}
+		if ("PackedByteArray".equals(type)) {
+			return "typedPackedByteArrayArg(" + paramName + ")";
+		}
+		if ("PackedInt32Array".equals(type)) {
+			return "typedPackedInt32ArrayArg(" + paramName + ")";
+		}
+		if ("PackedInt64Array".equals(type)) {
+			return "typedPackedInt64ArrayArg(" + paramName + ")";
+		}
+		if ("PackedFloat32Array".equals(type)) {
+			return "typedPackedFloat32ArrayArg(" + paramName + ")";
+		}
+		if ("PackedFloat64Array".equals(type)) {
+			return "typedPackedFloat64ArrayArg(" + paramName + ")";
+		}
+		if ("PackedStringArray".equals(type)) {
+			return "typedPackedStringArrayArg(" + paramName + ")";
+		}
+		if ("PackedVector2Array".equals(type)) {
+			return "typedPackedVector2ArrayArg(" + paramName + ")";
+		}
+		if ("PackedVector3Array".equals(type)) {
+			return "typedPackedVector3ArrayArg(" + paramName + ")";
+		}
+		if ("PackedColorArray".equals(type)) {
+			return "typedPackedColorArrayArg(" + paramName + ")";
+		}
 		if ("Array".equals(type)) {
 			return "typedArrayArg(" + paramName + ")";
 		}
@@ -333,6 +360,25 @@ final class TypedCallSupport {
 		}
 		if ("Dictionary".equals(type)) {
 			return "GodotDictionary".equals(propertyJavaType);
+		}
+		if ("PackedByteArray".equals(type)) {
+			return "byte[]".equals(propertyJavaType);
+		}
+		if ("PackedInt32Array".equals(type)) {
+			return "int[]".equals(propertyJavaType);
+		}
+		if ("PackedInt64Array".equals(type)) {
+			return "long[]".equals(propertyJavaType);
+		}
+		if ("PackedFloat32Array".equals(type) || "PackedFloat64Array".equals(type)) {
+			return "double[]".equals(propertyJavaType);
+		}
+		if ("PackedStringArray".equals(type)) {
+			return "String[]".equals(propertyJavaType);
+		}
+		if ("PackedVector2Array".equals(type) || "PackedVector3Array".equals(type)
+				|| "PackedColorArray".equals(type)) {
+			return "double[][]".equals(propertyJavaType);
 		}
 		if (BUILTIN_STRUCT_TYPES.contains(type)) {
 			return type.equals(propertyJavaType);

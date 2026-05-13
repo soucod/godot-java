@@ -4,6 +4,7 @@ import org.godot.internal.api.ApiIndex;
 import org.godot.bridge.Bridge;
 import org.godot.collection.GodotArray;
 import org.godot.collection.GodotDictionary;
+import org.godot.builtin.BuiltinMethodCache;
 import org.godot.core.Callable;
 import org.godot.core.GodotString;
 import org.godot.core.GodotStringName;
@@ -695,6 +696,42 @@ public abstract class Godot {
 		return new TypedVariantArg(value);
 	}
 
+	protected static Object typedPackedByteArrayArg(byte[] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_BYTE_ARRAY.id(), 16, 694024632L);
+	}
+
+	protected static Object typedPackedInt32ArrayArg(int[] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_INT32_ARRAY.id(), 16, 694024632L);
+	}
+
+	protected static Object typedPackedInt64ArrayArg(long[] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_INT64_ARRAY.id(), 16, 694024632L);
+	}
+
+	protected static Object typedPackedFloat32ArrayArg(double[] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_FLOAT32_ARRAY.id(), 16, 4094791666L);
+	}
+
+	protected static Object typedPackedFloat64ArrayArg(double[] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_FLOAT64_ARRAY.id(), 16, 4094791666L);
+	}
+
+	protected static Object typedPackedStringArrayArg(String[] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_STRING_ARRAY.id(), 16, 816187996L);
+	}
+
+	protected static Object typedPackedVector2ArrayArg(double[][] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_VECTOR2_ARRAY.id(), 16, 4188891560L);
+	}
+
+	protected static Object typedPackedVector3ArrayArg(double[][] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_VECTOR3_ARRAY.id(), 16, 3295363524L);
+	}
+
+	protected static Object typedPackedColorArrayArg(double[][] value) {
+		return new TypedPackedArrayArg(value, VariantType.PACKED_COLOR_ARRAY.id(), 16, 1007858200L);
+	}
+
 	protected static Object typedArrayArg(GodotArray value) {
 		return new TypedBuiltinArg(value, VariantType.ARRAY.id(), 8);
 	}
@@ -779,6 +816,9 @@ public abstract class Godot {
 		if (value instanceof TypedBuiltinArg builtinArg) {
 			return typedBuiltinArgSlot(builtinArg);
 		}
+		if (value instanceof TypedPackedArrayArg packedArrayArg) {
+			return typedPackedArrayArgSlot(packedArrayArg);
+		}
 		MemorySegment builtinSlot = typedBuiltinStructArgSlot(value);
 		if (builtinSlot != null) {
 			return NativeTypedArg.primitive(builtinSlot);
@@ -838,6 +878,100 @@ public abstract class Godot {
 			throw new RuntimeException("Failed to build typed builtin argument for type " + arg.variantType(), t);
 		} finally {
 			Bridge.destroyVariant(variant);
+		}
+	}
+
+	private static NativeTypedArg typedPackedArrayArgSlot(TypedPackedArrayArg arg) {
+		MemorySegment slot = Bridge.allocate(arg.size());
+		invokeBuiltinConstructor(arg.variantType(), 0, slot, MemorySegment.NULL);
+		try {
+			appendPackedArrayValues(slot, arg);
+			return new NativeTypedArg(slot, arg.variantType());
+		} catch (RuntimeException e) {
+			destroyTypedBuiltin(slot, arg.variantType());
+			throw e;
+		}
+	}
+
+	private static void appendPackedArrayValues(MemorySegment slot, TypedPackedArrayArg arg) {
+		if (arg.value() == null) {
+			return;
+		}
+		if (arg.value() instanceof byte[] values) {
+			for (byte value : values) {
+				invokePackedArrayAppend(slot, arg, Integer.valueOf(Byte.toUnsignedInt(value)));
+			}
+			return;
+		}
+		if (arg.value() instanceof int[] values) {
+			for (int value : values) {
+				invokePackedArrayAppend(slot, arg, Integer.valueOf(value));
+			}
+			return;
+		}
+		if (arg.value() instanceof long[] values) {
+			for (long value : values) {
+				invokePackedArrayAppend(slot, arg, Long.valueOf(value));
+			}
+			return;
+		}
+		if (arg.value() instanceof double[] values) {
+			for (double value : values) {
+				Object typedValue = arg.variantType() == VariantType.PACKED_FLOAT32_ARRAY.id()
+						? Float.valueOf((float) value)
+						: Double.valueOf(value);
+				invokePackedArrayAppend(slot, arg, typedValue);
+			}
+			return;
+		}
+		if (arg.value() instanceof String[] values) {
+			for (String value : values) {
+				invokePackedArrayAppend(slot, arg, typedStringArg(value));
+			}
+			return;
+		}
+		if (arg.value() instanceof double[][] values) {
+			for (double[] value : values) {
+				invokePackedArrayAppend(slot, arg, packedVectorElement(arg.variantType(), value));
+			}
+			return;
+		}
+		throw new IllegalArgumentException("Unsupported packed array argument: " + arg.value().getClass().getName());
+	}
+
+	private static Object packedVectorElement(int variantType, double[] value) {
+		if (variantType == VariantType.PACKED_VECTOR2_ARRAY.id()) {
+			requirePackedElementSize(value, 2, "PackedVector2Array");
+			return new Vector2(value[0], value[1]);
+		}
+		if (variantType == VariantType.PACKED_VECTOR3_ARRAY.id()) {
+			requirePackedElementSize(value, 3, "PackedVector3Array");
+			return new Vector3(value[0], value[1], value[2]);
+		}
+		if (variantType == VariantType.PACKED_COLOR_ARRAY.id()) {
+			requirePackedElementSize(value, 4, "PackedColorArray");
+			return new Color(value[0], value[1], value[2], value[3]);
+		}
+		throw new IllegalArgumentException("Unsupported packed vector array type: " + variantType);
+	}
+
+	private static void requirePackedElementSize(double[] value, int size, String typeName) {
+		if (value == null || value.length < size) {
+			throw new IllegalArgumentException(typeName + " elements must contain at least " + size + " values");
+		}
+	}
+
+	private static void invokePackedArrayAppend(MemorySegment slot, TypedPackedArrayArg arg, Object value) {
+		MethodHandle append = BuiltinMethodCache.getMethod(arg.variantType(), "append", arg.appendHash());
+		TypedArgFrame frame = typedArgFrame(new Object[] {value});
+		MemorySegment ret = Bridge.allocate(1);
+		try {
+			BuiltinMethodCache.invoke(append, slot, frame.argPtrs(), ret, 1);
+			if (ret.get(JAVA_BYTE, 0) == 0) {
+				throw new IllegalStateException("Failed to append value to packed array type " + arg.variantType());
+			}
+		} finally {
+			frame.destroy();
 		}
 	}
 
@@ -1082,6 +1216,9 @@ public abstract class Godot {
 	}
 
 	private record TypedBuiltinArg(Object value, int variantType, long size) {
+	}
+
+	private record TypedPackedArrayArg(Object value, int variantType, long size, long appendHash) {
 	}
 
 	private record TypedArgFrame(MemorySegment argPtrs, NativeTypedArg[] args) {

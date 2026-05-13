@@ -28,11 +28,14 @@ class JavaClassGeneratorTypedCallTest {
 	}
 
 	@Test
-	void unsupportedArgKeepsDynamicCallPath() {
+	void packedStringArrayArgUsesTypedPtrcallHelper() {
 		String source = generateSource(new MethodInfo("intersects", true, false, false, false, 2L,
 				List.of(new ArgInfo("values", "PackedStringArray", null, null)), "bool", null));
 
-		assertTrue(source.contains("return (boolean) callEngine(\"TestNode\", \"intersects\", 2L"), source);
+		assertTrue(source.contains("public boolean intersects(String[] values)"), source);
+		assertTrue(source.contains(
+				"return callEngineBool(\"TestNode\", \"intersects\", 2L, typedPackedStringArrayArg(values));"),
+				source);
 	}
 
 	@Test
@@ -193,11 +196,23 @@ class JavaClassGeneratorTypedCallTest {
 	}
 
 	@Test
-	void packedArrayArgKeepsDynamicCallPath() {
+	void packedArrayArgUsesTypedPtrcallHelper() {
 		String source = generateSource(new MethodInfo("set_bytes", false, false, false, false, 24L,
 				List.of(new ArgInfo("bytes", "PackedByteArray", null, null)), null, null));
 
-		assertTrue(source.contains("callEngine(\"TestNode\", \"set_bytes\", 24L"), source);
+		assertTrue(source.contains("public void setBytes(byte[] bytes)"), source);
+		assertTrue(source.contains(
+				"callEngineVoid(\"TestNode\", \"set_bytes\", 24L, typedPackedByteArrayArg(bytes));"), source);
+	}
+
+	@Test
+	void packedVectorArrayArgUsesTypedPtrcallHelper() {
+		String source = generateSource(new MethodInfo("set_points", false, false, false, false, 27L,
+				List.of(new ArgInfo("points", "PackedVector3Array", null, null)), null, null));
+
+		assertTrue(source.contains("public void setPoints(double[][] points)"), source);
+		assertTrue(source.contains(
+				"callEngineVoid(\"TestNode\", \"set_points\", 27L, typedPackedVector3ArrayArg(points));"), source);
 	}
 
 	@Test
@@ -240,11 +255,13 @@ class JavaClassGeneratorTypedCallTest {
 	}
 
 	@Test
-	void voidMethodWithUnsupportedArgKeepsDynamicCallPath() {
+	void voidMethodWithPackedStringArrayArgUsesTypedPtrcallHelper() {
 		String source = generateSource(new MethodInfo("set_position", false, false, false, false, 7L,
 				List.of(new ArgInfo("values", "PackedStringArray", null, null)), null, null));
 
-		assertTrue(source.contains("callEngine(\"TestNode\", \"set_position\", 7L"), source);
+		assertTrue(source.contains("public void setPosition(String[] values)"), source);
+		assertTrue(source.contains(
+				"callEngineVoid(\"TestNode\", \"set_position\", 7L, typedPackedStringArrayArg(values));"), source);
 	}
 
 	@Test

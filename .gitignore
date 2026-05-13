@@ -11,6 +11,7 @@ bin/
 
 ### AI
 .claude/
+openspec/
 
 ### Godot
 .godot/

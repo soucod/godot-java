@@ -48,6 +48,18 @@ final class TypedCallSupport {
 			return prefix + "Bool";
 		}
 		if ("int".equals(type)) {
+			if ("int8".equals(meta)) {
+				return prefix + "Int8";
+			}
+			if ("uint8".equals(meta)) {
+				return prefix + "Uint8";
+			}
+			if ("int16".equals(meta)) {
+				return prefix + "Int16";
+			}
+			if ("uint16".equals(meta)) {
+				return prefix + "Uint16";
+			}
 			if ("int32".equals(meta)) {
 				return prefix + "Int32";
 			}
@@ -129,14 +141,26 @@ final class TypedCallSupport {
 			return "java.lang.Boolean.valueOf(" + paramName + ")";
 		}
 		if ("int".equals(type)) {
+			if ("int8".equals(meta)) {
+				return "typedInt8Arg(" + paramName + ")";
+			}
+			if ("uint8".equals(meta)) {
+				return "typedUint8Arg(" + paramName + ")";
+			}
+			if ("int16".equals(meta)) {
+				return "typedInt16Arg(" + paramName + ")";
+			}
+			if ("uint16".equals(meta)) {
+				return "typedUint16Arg(" + paramName + ")";
+			}
 			if ("int32".equals(meta)) {
 				return "java.lang.Integer.valueOf((int) " + paramName + ")";
 			}
 			if ("uint32".equals(meta)) {
-				return "java.lang.Integer.valueOf((int) " + paramName + ")";
+				return "typedUint32Arg(" + paramName + ")";
 			}
 			if ("uint64".equals(meta)) {
-				return "java.lang.Long.valueOf(" + paramName + ")";
+				return "typedUint64Arg(" + paramName + ")";
 			}
 			if (meta == null || meta.isEmpty() || "int64".equals(meta)) {
 				return "java.lang.Long.valueOf(" + paramName + ")";
@@ -275,6 +299,18 @@ final class TypedCallSupport {
 		if (helper.endsWith("Bool")) {
 			return "boolean".equals(propertyJavaType);
 		}
+		if (helper.endsWith("Int8")) {
+			return "byte".equals(propertyJavaType) || "long".equals(propertyJavaType);
+		}
+		if (helper.endsWith("Uint8")) {
+			return "short".equals(propertyJavaType) || "long".equals(propertyJavaType);
+		}
+		if (helper.endsWith("Int16")) {
+			return "short".equals(propertyJavaType) || "long".equals(propertyJavaType);
+		}
+		if (helper.endsWith("Uint16")) {
+			return "int".equals(propertyJavaType) || "long".equals(propertyJavaType);
+		}
 		if (helper.endsWith("Int32")) {
 			return "int".equals(propertyJavaType) || "long".equals(propertyJavaType);
 		}
@@ -339,8 +375,10 @@ final class TypedCallSupport {
 			if ("uint64".equals(meta)) {
 				return "long".equals(propertyJavaType) || "java.math.BigInteger".equals(propertyJavaType);
 			}
-			return isIntegralJavaType(propertyJavaType) && ("int32".equals(meta) || "uint32".equals(meta)
-					|| "int64".equals(meta) || meta == null || meta.isEmpty());
+			return isIntegralJavaType(propertyJavaType)
+					&& ("int8".equals(meta) || "uint8".equals(meta) || "int16".equals(meta)
+							|| "uint16".equals(meta) || "int32".equals(meta) || "uint32".equals(meta)
+							|| "int64".equals(meta) || meta == null || meta.isEmpty());
 		}
 		if ("float".equals(type)) {
 			return isFloatingJavaType(propertyJavaType) && ("float".equals(meta) || "float32".equals(meta)

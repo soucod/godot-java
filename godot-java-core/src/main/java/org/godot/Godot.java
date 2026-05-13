@@ -29,6 +29,7 @@ import static java.lang.foreign.ValueLayout.JAVA_DOUBLE;
 import static java.lang.foreign.ValueLayout.JAVA_FLOAT;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 import static java.lang.foreign.ValueLayout.JAVA_LONG;
+import static java.lang.foreign.ValueLayout.JAVA_SHORT;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 
 public abstract class Godot {
@@ -42,6 +43,7 @@ public abstract class Godot {
 	private static final ConcurrentHashMap<String, MemorySegment> METHOD_BIND_CACHE = new ConcurrentHashMap<>();
 	private static final ConcurrentHashMap<String, MethodHandle> BUILTIN_CONSTRUCTOR_CACHE = new ConcurrentHashMap<>();
 	private static final ConcurrentHashMap<Integer, MethodHandle> BUILTIN_DESTRUCTOR_CACHE = new ConcurrentHashMap<>();
+	private static final BigInteger UINT64_MAX = new BigInteger("18446744073709551615");
 	private static final FunctionDescriptor BUILTIN_CONSTRUCTOR_DESC = FunctionDescriptor.ofVoid(ADDRESS, ADDRESS);
 	private static final FunctionDescriptor BUILTIN_DESTRUCTOR_DESC = FunctionDescriptor.ofVoid(ADDRESS);
 
@@ -234,6 +236,24 @@ public abstract class Godot {
 		return callEnginePtr(className, methodName, hash, 4, ret -> ret.get(JAVA_INT, 0), typedArgs);
 	}
 
+	protected byte callEngineInt8(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 1, ret -> ret.get(JAVA_BYTE, 0), typedArgs);
+	}
+
+	protected short callEngineUint8(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 1, ret -> (short) Byte.toUnsignedInt(ret.get(JAVA_BYTE, 0)),
+				typedArgs);
+	}
+
+	protected short callEngineInt16(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 2, ret -> ret.get(JAVA_SHORT, 0), typedArgs);
+	}
+
+	protected int callEngineUint16(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 2, ret -> Short.toUnsignedInt(ret.get(JAVA_SHORT, 0)),
+				typedArgs);
+	}
+
 	protected long callEngineInt64(String className, String methodName, long hash, Object... typedArgs) {
 		return callEnginePtr(className, methodName, hash, 8, ret -> ret.get(JAVA_LONG, 0), typedArgs);
 	}
@@ -423,6 +443,24 @@ public abstract class Godot {
 
 	protected static int callStaticInt32(String className, String methodName, long hash, Object... typedArgs) {
 		return callStaticPtr(className, methodName, hash, 4, ret -> ret.get(JAVA_INT, 0), typedArgs);
+	}
+
+	protected static byte callStaticInt8(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 1, ret -> ret.get(JAVA_BYTE, 0), typedArgs);
+	}
+
+	protected static short callStaticUint8(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 1,
+				ret -> (short) Byte.toUnsignedInt(ret.get(JAVA_BYTE, 0)), typedArgs);
+	}
+
+	protected static short callStaticInt16(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 2, ret -> ret.get(JAVA_SHORT, 0), typedArgs);
+	}
+
+	protected static int callStaticUint16(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 2, ret -> Short.toUnsignedInt(ret.get(JAVA_SHORT, 0)),
+				typedArgs);
 	}
 
 	protected static long callStaticInt64(String className, String methodName, long hash, Object... typedArgs) {
@@ -696,6 +734,52 @@ public abstract class Godot {
 		return new TypedVariantArg(value);
 	}
 
+	protected static Object typedInt8Arg(long value) {
+		if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) {
+			throw new IllegalArgumentException("int8 argument out of range: " + value);
+		}
+		return new TypedSizedIntegerArg(value, 1);
+	}
+
+	protected static Object typedUint8Arg(long value) {
+		if (value < 0 || value > 0xffL) {
+			throw new IllegalArgumentException("uint8 argument out of range: " + value);
+		}
+		return new TypedSizedIntegerArg(value, 1);
+	}
+
+	protected static Object typedInt16Arg(long value) {
+		if (value < Short.MIN_VALUE || value > Short.MAX_VALUE) {
+			throw new IllegalArgumentException("int16 argument out of range: " + value);
+		}
+		return new TypedSizedIntegerArg(value, 2);
+	}
+
+	protected static Object typedUint16Arg(long value) {
+		if (value < 0 || value > 0xffffL) {
+			throw new IllegalArgumentException("uint16 argument out of range: " + value);
+		}
+		return new TypedSizedIntegerArg(value, 2);
+	}
+
+	protected static Object typedUint32Arg(long value) {
+		if (value < 0 || value > 0xffffffffL) {
+			throw new IllegalArgumentException("uint32 argument out of range: " + value);
+		}
+		return new TypedSizedIntegerArg(value, 4);
+	}
+
+	protected static Object typedUint64Arg(BigInteger value) {
+		if (value == null || value.signum() < 0 || value.compareTo(UINT64_MAX) > 0) {
+			throw new IllegalArgumentException("uint64 argument out of range: " + value);
+		}
+		return new TypedUint64Arg(value);
+	}
+
+	protected static Object typedUint64Arg(long value) {
+		return new TypedUint64Arg(BigInteger.valueOf(value));
+	}
+
 	protected static Object typedPackedByteArrayArg(byte[] value) {
 		return new TypedPackedArrayArg(value, VariantType.PACKED_BYTE_ARRAY.id(), 16, 694024632L);
 	}
@@ -792,6 +876,22 @@ public abstract class Godot {
 		if (value instanceof BigInteger i) {
 			MemorySegment slot = Bridge.allocate(8);
 			slot.set(JAVA_LONG, 0, i.longValue());
+			return NativeTypedArg.primitive(slot);
+		}
+		if (value instanceof TypedSizedIntegerArg integerArg) {
+			MemorySegment slot = Bridge.allocate(integerArg.size());
+			if (integerArg.size() == 1) {
+				slot.set(JAVA_BYTE, 0, (byte) integerArg.value());
+			} else if (integerArg.size() == 2) {
+				slot.set(JAVA_SHORT, 0, (short) integerArg.value());
+			} else {
+				slot.set(JAVA_INT, 0, (int) integerArg.value());
+			}
+			return NativeTypedArg.primitive(slot);
+		}
+		if (value instanceof TypedUint64Arg integerArg) {
+			MemorySegment slot = Bridge.allocate(8);
+			slot.set(JAVA_LONG, 0, integerArg.value().longValue());
 			return NativeTypedArg.primitive(slot);
 		}
 		if (value instanceof TypedStringArg s) {
@@ -1213,6 +1313,12 @@ public abstract class Godot {
 	}
 
 	private record TypedVariantArg(Object value) {
+	}
+
+	private record TypedSizedIntegerArg(long value, long size) {
+	}
+
+	private record TypedUint64Arg(BigInteger value) {
 	}
 
 	private record TypedBuiltinArg(Object value, int variantType, long size) {

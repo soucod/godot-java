@@ -95,9 +95,31 @@ class JavaClassGeneratorTypedCallTest {
 				List.of(new ArgInfo("mask", "int", "uint32", null)), "int", "uint32"));
 
 		assertTrue(source.contains("public long setMask(long mask)"), source);
-		assertTrue(source.contains(
-				"return callEngineUint32(\"TestNode\", \"set_mask\", 16L, java.lang.Integer.valueOf((int) mask));"),
+		assertTrue(source.contains("return callEngineUint32(\"TestNode\", \"set_mask\", 16L, typedUint32Arg(mask));"),
 				source);
+	}
+
+	@Test
+	void smallIntegerMetadataUsesSizedTypedPtrcallHelpers() {
+		String source = generateSource(new MethodInfo("set_small_values", true, false, false, false, 28L,
+				List.of(new ArgInfo("a", "int", "int8", null), new ArgInfo("b", "int", "uint8", null),
+						new ArgInfo("c", "int", "int16", null), new ArgInfo("d", "int", "uint16", null)),
+				"int", "uint16"));
+
+		assertTrue(source.contains("public int setSmallValues(byte a, short b, short c, int d)"), source);
+		assertTrue(source.contains(
+				"return callEngineUint16(\"TestNode\", \"set_small_values\", 28L, typedInt8Arg(a), typedUint8Arg(b), typedInt16Arg(c), typedUint16Arg(d));"),
+				source);
+	}
+
+	@Test
+	void staticSmallIntegerMetadataUsesStaticSizedTypedPtrcallHelpers() {
+		String source = generateSource(new MethodInfo("get_small_value", false, true, false, false, 29L,
+				List.of(new ArgInfo("value", "int", "int16", null)), "int", "int8"));
+
+		assertTrue(source.contains("public static byte getSmallValue(short value)"), source);
+		assertTrue(source.contains(
+				"return callStaticInt8(\"TestNode\", \"get_small_value\", 29L, typedInt16Arg(value));"), source);
 	}
 
 	@Test
@@ -105,9 +127,9 @@ class JavaClassGeneratorTypedCallTest {
 		String source = generateSource(new MethodInfo("set_large_mask", true, false, false, false, 18L,
 				List.of(new ArgInfo("mask", "int", "uint64", null)), "int", "uint64"));
 
-		assertTrue(source.contains("public java.math.BigInteger setLargeMask(long mask)"), source);
+		assertTrue(source.contains("public java.math.BigInteger setLargeMask(java.math.BigInteger mask)"), source);
 		assertTrue(source.contains(
-				"return callEngineUint64(\"TestNode\", \"set_large_mask\", 18L, java.lang.Long.valueOf(mask));"),
+				"return callEngineUint64(\"TestNode\", \"set_large_mask\", 18L, typedUint64Arg(mask));"),
 				source);
 	}
 

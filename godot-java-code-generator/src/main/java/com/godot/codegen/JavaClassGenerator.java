@@ -369,7 +369,7 @@ public class JavaClassGenerator {
 			List<String> paramTypes = new ArrayList<>();
 			for (int i = 0; i < method.arguments().size(); i++) {
 				ArgInfo arg = method.arguments().get(i);
-				String javaType = TypeMapper.toJavaType(arg.type());
+				String javaType = TypeMapper.getJavaParamType(arg.type(), arg.meta());
 				String javaName = toJavaParamName(arg.name());
 				params.add(ParameterSpec.builder(toTypeName(javaType), javaName).build());
 				paramNames.add(javaName);
@@ -579,6 +579,8 @@ public class JavaClassGenerator {
 		}
 		if (dv.matches("-?\\d+")) {
 			switch (javaType) {
+				case "java.math.BigInteger" :
+					return "java.math.BigInteger.valueOf(" + dv + "L)";
 				case "long" :
 					return dv + "L";
 				case "int" :

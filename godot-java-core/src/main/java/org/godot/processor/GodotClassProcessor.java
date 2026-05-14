@@ -1225,7 +1225,8 @@ public class GodotClassProcessor extends AbstractProcessor {
 						.collect(java.util.stream.Collectors.joining(", ")) + ">");
 			}
 			w.write(" " + si.javaName() + "() {\n");
-			w.write("        return new TypedSignal" + arity + "<>(owner, \"" + si.signalName() + "\");\n");
+			String diamond = arity > 0 ? "<>" : "";
+			w.write("        return new TypedSignal" + arity + diamond + "(owner, \"" + si.signalName() + "\");\n");
 			w.write("    }\n");
 		}
 

@@ -87,10 +87,10 @@ public abstract class Godot {
 	 * @return a fully initialized Godot-backed Java instance, or null on failure
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends Godot> T instantiate(String godotClassName) {
+	public static <T extends Godot> T create(String godotClassName) {
 		String parentName = Dispatch.getParentClass(godotClassName);
 		if (parentName == null) {
-			logger.error("Godot.instantiate: unknown class '{}'", godotClassName);
+			logger.error("Godot.create: unknown class '{}'", godotClassName);
 			return null;
 		}
 
@@ -100,14 +100,13 @@ public abstract class Godot {
 		});
 		long nativePtr = nativeObj.address();
 		if (nativePtr == 0) {
-			logger.error("Godot.instantiate: native construction failed for '{}' (parent='{}')", godotClassName,
-					parentName);
+			logger.error("Godot.create: native construction failed for '{}' (parent='{}')", godotClassName, parentName);
 			return null;
 		}
 
 		Godot instance = Dispatch.createInstance(godotClassName, nativePtr);
 		if (instance == null) {
-			logger.error("Godot.instantiate: Dispatch.createInstance returned null for '{}'", godotClassName);
+			logger.error("Godot.create: Dispatch.createInstance returned null for '{}'", godotClassName);
 			return null;
 		}
 		JavaObjectMap.put(nativePtr, instance);

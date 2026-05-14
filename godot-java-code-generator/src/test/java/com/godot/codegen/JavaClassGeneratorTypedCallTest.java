@@ -33,8 +33,9 @@ class JavaClassGeneratorTypedCallTest {
 				List.of(new ArgInfo("values", "PackedStringArray", null, null)), "bool", null));
 
 		assertTrue(source.contains("public boolean intersects(String[] values)"), source);
-		assertTrue(source.contains(
-				"return callEngineBool(\"TestNode\", \"intersects\", 2L, typedPackedStringArrayArg(values));"),
+		assertTrue(
+				source.contains(
+						"return callEngineBool(\"TestNode\", \"intersects\", 2L, typedPackedStringArrayArg(values));"),
 				source);
 	}
 
@@ -78,7 +79,7 @@ class JavaClassGeneratorTypedCallTest {
 	}
 
 	@Test
-	void enumReturnAndArgUseInt32TypedPtrcallHelper() {
+	void globalEnumReturnAndArgUseInt32TypedPtrcallHelper() {
 		String source = generateSource(new MethodInfo("set_error", true, false, false, false, 15L,
 				List.of(new ArgInfo("error", "enum::Error", null, null)), "enum::Error", null));
 
@@ -87,6 +88,26 @@ class JavaClassGeneratorTypedCallTest {
 				source.contains(
 						"return callEngineInt32(\"TestNode\", \"set_error\", 15L, java.lang.Integer.valueOf(error));"),
 				source);
+	}
+
+	@Test
+	void classNestedEnumReturnAndArgUseEnumType() {
+		EnumInfo selectMode = new EnumInfo("SelectMode", false,
+				List.of(new EnumValue("SELECT_SINGLE", 0), new EnumValue("SELECT_MULTI", 1)));
+		ClassInfo tree = new ClassInfo("Tree", "Control", false, true, "core", List.of(selectMode), List.of(),
+				List.of(), List.of());
+		ClassInfo testNode = new ClassInfo("TestNode", null, false, false, "core", List.of(),
+				List.of(new MethodInfo("set_mode", true, false, false, false, 40L,
+						List.of(new ArgInfo("mode", "enum::Tree.SelectMode", null, null)), "enum::Tree.SelectMode",
+						null)),
+				List.of(), List.of());
+
+		String source = new JavaClassGenerator("org.godot.node", List.of(testNode, tree)).generateClass(testNode)
+				.toString();
+
+		assertTrue(source.contains("public Tree.SelectMode setMode(Tree.SelectMode mode)"), source);
+		assertTrue(source.contains("callEngineInt32(\"TestNode\", \"set_mode\", 40L, mode.value)"), source);
+		assertTrue(source.contains("return Tree.SelectMode.fromValue(callEngineInt32("), source);
 	}
 
 	@Test
@@ -118,8 +139,9 @@ class JavaClassGeneratorTypedCallTest {
 				List.of(new ArgInfo("value", "int", "int16", null)), "int", "int8"));
 
 		assertTrue(source.contains("public static byte getSmallValue(short value)"), source);
-		assertTrue(source.contains(
-				"return callStaticInt8(\"TestNode\", \"get_small_value\", 29L, typedInt16Arg(value));"), source);
+		assertTrue(
+				source.contains("return callStaticInt8(\"TestNode\", \"get_small_value\", 29L, typedInt16Arg(value));"),
+				source);
 	}
 
 	@Test
@@ -128,8 +150,9 @@ class JavaClassGeneratorTypedCallTest {
 				List.of(new ArgInfo("mask", "int", "uint64", null)), "int", "uint64"));
 
 		assertTrue(source.contains("public java.math.BigInteger setLargeMask(java.math.BigInteger mask)"), source);
-		assertTrue(source.contains(
-				"return callEngineUint64(\"TestNode\", \"set_large_mask\", 18L, typedUint64Arg(mask));"),
+		assertTrue(
+				source.contains(
+						"return callEngineUint64(\"TestNode\", \"set_large_mask\", 18L, typedUint64Arg(mask));"),
 				source);
 	}
 
@@ -191,17 +214,16 @@ class JavaClassGeneratorTypedCallTest {
 	}
 
 	@Test
-	void selectedTypedArrayReturnsUseCopyingHelpers() {
-		String namesSource = generateSource(
-				new MethodInfo("get_groups", true, false, false, false, 32L, List.of(), "typedarray::StringName", null));
-		assertTrue(namesSource.contains("public String[] getGroups()"), namesSource);
-		assertTrue(namesSource.contains("return callEngineTypedStringArray(\"TestNode\", \"get_groups\", 32L);"),
-				namesSource);
+	void typedArrayReturnsUseGenericGodotArray() {
+		String namesSource = generateSource(new MethodInfo("get_groups", true, false, false, false, 32L, List.of(),
+				"typedarray::StringName", null));
+		assertTrue(namesSource.contains("public GodotArray<String> getGroups()"), namesSource);
+		assertTrue(namesSource.contains("return callEngineArray(\"TestNode\", \"get_groups\", 32L);"), namesSource);
 
 		String intSource = generateSource(
 				new MethodInfo("get_ids", true, false, false, false, 33L, List.of(), "typedarray::int", null));
-		assertTrue(intSource.contains("public long[] getIds()"), intSource);
-		assertTrue(intSource.contains("return callEngineTypedIntArray(\"TestNode\", \"get_ids\", 33L);"), intSource);
+		assertTrue(intSource.contains("public GodotArray<Long> getIds()"), intSource);
+		assertTrue(intSource.contains("return callEngineArray(\"TestNode\", \"get_ids\", 33L);"), intSource);
 	}
 
 	@Test
@@ -240,8 +262,9 @@ class JavaClassGeneratorTypedCallTest {
 				List.of(new ArgInfo("key", "StringName", null, null)), "PackedByteArray", null));
 
 		assertTrue(source.contains("public byte[] getBytes(String key)"), source);
-		assertTrue(source.contains(
-				"return callEnginePackedByteArray(\"TestNode\", \"get_bytes\", 23L, typedStringNameArg(key));"),
+		assertTrue(
+				source.contains(
+						"return callEnginePackedByteArray(\"TestNode\", \"get_bytes\", 23L, typedStringNameArg(key));"),
 				source);
 	}
 
@@ -251,8 +274,8 @@ class JavaClassGeneratorTypedCallTest {
 				List.of(new ArgInfo("bytes", "PackedByteArray", null, null)), null, null));
 
 		assertTrue(source.contains("public void setBytes(byte[] bytes)"), source);
-		assertTrue(source.contains(
-				"callEngineVoid(\"TestNode\", \"set_bytes\", 24L, typedPackedByteArrayArg(bytes));"), source);
+		assertTrue(source.contains("callEngineVoid(\"TestNode\", \"set_bytes\", 24L, typedPackedByteArrayArg(bytes));"),
+				source);
 	}
 
 	@Test
@@ -261,18 +284,19 @@ class JavaClassGeneratorTypedCallTest {
 				List.of(new ArgInfo("points", "PackedVector3Array", null, null)), null, null));
 
 		assertTrue(source.contains("public void setPoints(double[][] points)"), source);
-		assertTrue(source.contains(
-				"callEngineVoid(\"TestNode\", \"set_points\", 27L, typedPackedVector3ArrayArg(points));"), source);
+		assertTrue(
+				source.contains(
+						"callEngineVoid(\"TestNode\", \"set_points\", 27L, typedPackedVector3ArrayArg(points));"),
+				source);
 	}
 
 	@Test
 	void packedVectorArrayReturnUsesTypedPtrcallHelperWhenArgsAreSupported() {
-		String source = generateSource(new MethodInfo("get_points", true, false, false, false, 25L, List.of(),
-				"PackedVector3Array", null));
+		String source = generateSource(
+				new MethodInfo("get_points", true, false, false, false, 25L, List.of(), "PackedVector3Array", null));
 
 		assertTrue(source.contains("public double[][] getPoints()"), source);
-		assertTrue(source.contains("return callEnginePackedVector3Array(\"TestNode\", \"get_points\", 25L);"),
-				source);
+		assertTrue(source.contains("return callEnginePackedVector3Array(\"TestNode\", \"get_points\", 25L);"), source);
 	}
 
 	@Test
@@ -310,8 +334,10 @@ class JavaClassGeneratorTypedCallTest {
 				List.of(new ArgInfo("values", "PackedStringArray", null, null)), null, null));
 
 		assertTrue(source.contains("public void setPosition(String[] values)"), source);
-		assertTrue(source.contains(
-				"callEngineVoid(\"TestNode\", \"set_position\", 7L, typedPackedStringArrayArg(values));"), source);
+		assertTrue(
+				source.contains(
+						"callEngineVoid(\"TestNode\", \"set_position\", 7L, typedPackedStringArrayArg(values));"),
+				source);
 	}
 
 	@Test

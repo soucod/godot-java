@@ -28,4 +28,6 @@ public @interface Export {
 	PropertyHint hint() default PropertyHint.NONE;
 
 	String hintString() default "";
+
+	PropertyUsage usage() default PropertyUsage.DEFAULT;
 }

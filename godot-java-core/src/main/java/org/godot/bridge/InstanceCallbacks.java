@@ -490,7 +490,7 @@ public final class InstanceCallbacks {
 			listBuf.set(ADDRESS, offset + StructOffsets.PROPERTY_INFO_OFF_HINT_STRING,
 					MemorySegment.ofAddress(hintString.segment().address()));
 
-			listBuf.set(JAVA_INT, offset + StructOffsets.PROPERTY_INFO_OFF_USAGE, 1 | 4 | 8);
+			listBuf.set(JAVA_INT, offset + StructOffsets.PROPERTY_INFO_OFF_USAGE, meta.usage());
 		}
 
 		return listBuf.address();

@@ -8,6 +8,8 @@ import org.godot.builtin.BuiltinMethodCache;
 import org.godot.core.Callable;
 import org.godot.core.GodotString;
 import org.godot.core.GodotStringName;
+import org.godot.internal.dispatch.Dispatch;
+import org.godot.internal.ref.JavaObjectMap;
 import org.godot.core.Signal;
 import org.godot.core.Variant;
 import org.godot.core.VariantUtils;
@@ -73,6 +75,52 @@ public abstract class Godot {
 		this.nativeObject = 0;
 	}
 
+	/**
+	 * Programmatically instantiate a registered {@code @GodotClass} by name.
+	 * Creates both the native Godot object and the Java wrapper, binds them, and
+	 * returns the typed Java instance.
+	 *
+	 * @param godotClassName
+	 *            the name registered via {@code @GodotClass(name=...)}
+	 * @param <T>
+	 *            the expected Java type
+	 * @return a fully initialized Godot-backed Java instance, or null on failure
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends Godot> T instantiate(String godotClassName) {
+		String parentName = Dispatch.getParentClass(godotClassName);
+		if (parentName == null) {
+			logger.error("Godot.instantiate: unknown class '{}'", godotClassName);
+			return null;
+		}
+
+		MemorySegment nativeObj = Bridge.runScoped(() -> {
+			GodotStringName parentSn = GodotStringName.fromJavaString(parentName);
+			return Bridge.callPtr(ApiIndex.CLASSDB_CONSTRUCT_OBJECT2, parentSn.segment());
+		});
+		long nativePtr = nativeObj.address();
+		if (nativePtr == 0) {
+			logger.error("Godot.instantiate: native construction failed for '{}' (parent='{}')", godotClassName,
+					parentName);
+			return null;
+		}
+
+		Godot instance = Dispatch.createInstance(godotClassName, nativePtr);
+		if (instance == null) {
+			logger.error("Godot.instantiate: Dispatch.createInstance returned null for '{}'", godotClassName);
+			return null;
+		}
+		JavaObjectMap.put(nativePtr, instance);
+
+		Bridge.runScoped(() -> {
+			GodotStringName classNameSn = GodotStringName.fromJavaString(godotClassName);
+			Bridge.callVoid(ApiIndex.OBJECT_SET_INSTANCE, nativeObj, classNameSn.segment(), nativeObj);
+			return null;
+		});
+
+		return (T) instance;
+	}
+
 	public long getPtr() {
 		return nativeObject;
 	}
@@ -91,6 +139,7 @@ public abstract class Godot {
 
 	public void invalidate() {
 		this.valid = false;
+		this.nativeObject = 0;
 	}
 
 	protected void checkValid() {
@@ -375,8 +424,7 @@ public abstract class Godot {
 				Godot::readTypedDictionaryReturn, typedArgs);
 	}
 
-	protected String[] callEngineTypedStringArray(String className, String methodName, long hash,
-			Object... typedArgs) {
+	protected String[] callEngineTypedStringArray(String className, String methodName, long hash, Object... typedArgs) {
 		return stringArrayFromGodotArray(callEngineArray(className, methodName, hash, typedArgs));
 	}
 
@@ -470,8 +518,8 @@ public abstract class Godot {
 	}
 
 	protected static short callStaticUint8(String className, String methodName, long hash, Object... typedArgs) {
-		return callStaticPtr(className, methodName, hash, 1,
-				ret -> (short) Byte.toUnsignedInt(ret.get(JAVA_BYTE, 0)), typedArgs);
+		return callStaticPtr(className, methodName, hash, 1, ret -> (short) Byte.toUnsignedInt(ret.get(JAVA_BYTE, 0)),
+				typedArgs);
 	}
 
 	protected static short callStaticInt16(String className, String methodName, long hash, Object... typedArgs) {
@@ -1057,11 +1105,13 @@ public abstract class Godot {
 			return;
 		}
 		if (arg.value() instanceof double[] values) {
+			boolean isFloat32 = arg.variantType() == VariantType.PACKED_FLOAT32_ARRAY.id();
 			for (double value : values) {
-				Object typedValue = arg.variantType() == VariantType.PACKED_FLOAT32_ARRAY.id()
-						? Float.valueOf((float) value)
-						: Double.valueOf(value);
-				invokePackedArrayAppend(slot, arg, typedValue);
+				if (isFloat32) {
+					invokePackedArrayAppend(slot, arg, Float.valueOf((float) value));
+				} else {
+					invokePackedArrayAppend(slot, arg, Double.valueOf(value));
+				}
 			}
 			return;
 		}
@@ -1104,7 +1154,7 @@ public abstract class Godot {
 
 	private static void invokePackedArrayAppend(MemorySegment slot, TypedPackedArrayArg arg, Object value) {
 		MethodHandle append = BuiltinMethodCache.getMethod(arg.variantType(), "append", arg.appendHash());
-		TypedArgFrame frame = typedArgFrame(new Object[] {value});
+		TypedArgFrame frame = typedArgFrame(new Object[]{value});
 		MemorySegment ret = Bridge.allocate(1);
 		try {
 			BuiltinMethodCache.invoke(append, slot, frame.argPtrs(), ret, 1);
@@ -1117,7 +1167,7 @@ public abstract class Godot {
 	}
 
 	private static NativeTypedArg typedObjectArgSlot(TypedObjectArg arg) {
-		if (arg.value() == null || arg.value().getPtr() == 0) {
+		if (arg.value() == null || !arg.value().isValid()) {
 			MemorySegment slot = Bridge.allocate(ADDRESS.byteSize());
 			slot.set(ADDRESS, 0, MemorySegment.NULL);
 			return NativeTypedArg.primitive(slot);
@@ -1192,7 +1242,8 @@ public abstract class Godot {
 		return readOwnedBuiltinReturn(value, VariantType.DICTIONARY.id(), GodotDictionary::fromOwnedVariant);
 	}
 
-	private static <T> T readOwnedBuiltinReturn(MemorySegment value, int variantType, Function<MemorySegment, T> reader) {
+	private static <T> T readOwnedBuiltinReturn(MemorySegment value, int variantType,
+			Function<MemorySegment, T> reader) {
 		try {
 			MemorySegment variant = Bridge.allocVariant();
 			MethodHandle ctor = Variant.getTypeConstructor(variantType);

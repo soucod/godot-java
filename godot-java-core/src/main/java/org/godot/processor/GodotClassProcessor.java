@@ -91,6 +91,7 @@ public class GodotClassProcessor extends AbstractProcessor {
 		if (roundEnv.processingOver()) {
 			generateRegistry();
 			generateDispatchIndex();
+			generateSignalFacades();
 			return true;
 		}
 
@@ -171,7 +172,8 @@ public class GodotClassProcessor extends AbstractProcessor {
 			List<String> paramNames) {
 	}
 
-	private record FieldInfo(String javaName, String propertyName, String type, int hintId, String hintString) {
+	private record FieldInfo(String javaName, String propertyName, String type, int hintId, String hintString,
+			int usage, String group, String groupHint, String subgroup, String subgroupHint) {
 	}
 
 	private record SignalInfo(String javaName, String signalName, List<String> paramTypes, List<String> paramNames) {
@@ -190,6 +192,10 @@ public class GodotClassProcessor extends AbstractProcessor {
 
 	private void collectMembers(TypeElement typeElement, List<MethodInfo> methods, List<FieldInfo> fields,
 			List<SignalInfo> signals) {
+		String currentGroup = "";
+		String currentGroupHint = "";
+		String currentSubgroup = "";
+		String currentSubgroupHint = "";
 		for (Element member : typeElement.getEnclosedElements()) {
 			if (member.getKind() == ElementKind.METHOD) {
 				ExecutableElement method = (ExecutableElement) member;
@@ -243,6 +249,20 @@ public class GodotClassProcessor extends AbstractProcessor {
 				methods.add(new MethodInfo(methodName, godotName, returnType, paramTypes, paramNames));
 			} else if (member.getKind() == ElementKind.FIELD) {
 				VariableElement field = (VariableElement) member;
+				// Track group/subgroup state
+				org.godot.annotation.ExportGroup groupAnn = field.getAnnotation(org.godot.annotation.ExportGroup.class);
+				if (groupAnn != null) {
+					currentGroup = groupAnn.value();
+					currentGroupHint = groupAnn.hint();
+					currentSubgroup = "";
+					currentSubgroupHint = "";
+				}
+				org.godot.annotation.ExportSubgroup subgroupAnn = field
+						.getAnnotation(org.godot.annotation.ExportSubgroup.class);
+				if (subgroupAnn != null) {
+					currentSubgroup = subgroupAnn.value();
+					currentSubgroupHint = subgroupAnn.hint();
+				}
 				if (field.getAnnotation(org.godot.annotation.Export.class) != null) {
 					org.godot.annotation.Export ann = field.getAnnotation(org.godot.annotation.Export.class);
 					String propName = (ann != null && !ann.propertyName().isEmpty())
@@ -250,8 +270,10 @@ public class GodotClassProcessor extends AbstractProcessor {
 							: field.getSimpleName().toString();
 					int hintId = ann != null ? ann.hint().id() : 0;
 					String hintString = ann != null ? ann.hintString() : "";
+					int usage = ann != null ? ann.usage().value : (1 | 2 | 4 | 8);
 					fields.add(new FieldInfo(field.getSimpleName().toString(), propName,
-							typeToDescriptor(field.asType()), hintId, hintString));
+							typeToDescriptor(field.asType()), hintId, hintString, usage, currentGroup, currentGroupHint,
+							currentSubgroup, currentSubgroupHint));
 				}
 			}
 		}
@@ -596,8 +618,12 @@ public class GodotClassProcessor extends AbstractProcessor {
 		for (Map.Entry<String, List<FieldInfo>> e : classFields.entrySet()) {
 			w.write("        m.put(\"" + e.getKey() + "\", new PropertyMeta[] {\n");
 			for (FieldInfo f : e.getValue()) {
-				w.write("            new PropertyMeta(\"" + f.javaName() + "\", \"" + f.propertyName() + "\", \""
-						+ f.type() + "\", " + f.hintId() + ", \"" + escapeJava(f.hintString()) + "\"),\n");
+				String line = "            new PropertyMeta(" + "\"" + f.javaName() + "\"" + ", " + "\""
+						+ f.propertyName() + "\"" + ", " + "\"" + f.type() + "\"" + ", " + f.hintId() + ", " + "\""
+						+ escapeJava(f.hintString()) + "\"" + ", " + f.usage() + ", " + "\"" + escapeJava(f.group())
+						+ "\"" + ", " + "\"" + escapeJava(f.groupHint()) + "\"" + ", " + "\"" + escapeJava(f.subgroup())
+						+ "\"" + ", " + "\"" + escapeJava(f.subgroupHint()) + "\"" + "),\n";
+				w.write(line);
 			}
 			w.write("        });\n");
 		}
@@ -1105,6 +1131,133 @@ public class GodotClassProcessor extends AbstractProcessor {
 						+ ") VariantUtils.toObject(Variant.fromObjectPtr(objPtr" + index + ")) : null;\n");
 			}
 		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Generate typed signal facade classes
+	// -----------------------------------------------------------------------
+
+	private static final int MAX_TYPED_SIGNAL_ARITY = 5;
+
+	private void generateSignalFacades() {
+		for (ClassEntry entry : discoveredClasses) {
+			TypeElement typeElement = processingEnv.getElementUtils().getTypeElement(entry.fqn());
+			if (typeElement == null)
+				continue;
+
+			List<SignalInfo> signals = new ArrayList<>();
+			collectMembers(typeElement, new ArrayList<>(), new ArrayList<>(), signals);
+			if (signals.isEmpty())
+				continue;
+
+			List<SignalInfo> supported = new ArrayList<>();
+			for (SignalInfo si : signals) {
+				if (si.paramTypes().size() > MAX_TYPED_SIGNAL_ARITY)
+					continue;
+				boolean allSupported = true;
+				for (String pt : si.paramTypes()) {
+					if (!isSupportedSignalParamType(pt)) {
+						allSupported = false;
+						break;
+					}
+				}
+				if (allSupported) {
+					supported.add(si);
+				}
+			}
+			if (supported.isEmpty())
+				continue;
+
+			String fqn = entry.fqn();
+			String pkg = fqn.substring(0, fqn.lastIndexOf('.'));
+			String simpleName = fqn.substring(fqn.lastIndexOf('.') + 1);
+			String facadeName = simpleName + "Signals";
+			String facadeFQN = pkg + "." + facadeName;
+
+			try {
+				JavaFileObject sourceFile = processingEnv.getFiler().createSourceFile(facadeFQN);
+				try (Writer w = sourceFile.openWriter()) {
+					writeSignalFacade(w, pkg, simpleName, facadeName, supported);
+				}
+			} catch (IOException e) {
+				processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+						"Failed to generate signal facade " + facadeFQN + ": " + e.getMessage());
+			}
+		}
+	}
+
+	private void writeSignalFacade(Writer w, String pkg, String ownerSimpleName, String facadeName,
+			List<SignalInfo> signals) throws IOException {
+		w.write("package " + pkg + ";\n\n");
+
+		Set<Integer> arities = new LinkedHashSet<>();
+		for (SignalInfo si : signals) {
+			arities.add(si.paramTypes().size());
+		}
+		for (int arity : arities) {
+			w.write("import org.godot.core.TypedSignal" + arity + ";\n");
+		}
+
+		Set<String> typeImports = new LinkedHashSet<>();
+		for (SignalInfo si : signals) {
+			for (String pt : si.paramTypes()) {
+				if (needsSignalImport(pt)) {
+					typeImports.add(pt);
+				}
+			}
+		}
+		for (String imp : typeImports) {
+			w.write("import " + imp + ";\n");
+		}
+		w.write("\n");
+
+		w.write("public final class " + facadeName + " {\n");
+		w.write("    private final " + ownerSimpleName + " owner;\n\n");
+		w.write("    public " + facadeName + "(" + ownerSimpleName + " owner) {\n");
+		w.write("        this.owner = owner;\n");
+		w.write("    }\n");
+
+		for (SignalInfo si : signals) {
+			int arity = si.paramTypes().size();
+			w.write("\n    public TypedSignal" + arity);
+			if (arity > 0) {
+				w.write("<" + si.paramTypes().stream().map(this::genericTypeForSignal)
+						.collect(java.util.stream.Collectors.joining(", ")) + ">");
+			}
+			w.write(" " + si.javaName() + "() {\n");
+			w.write("        return new TypedSignal" + arity + "<>(owner, \"" + si.signalName() + "\");\n");
+			w.write("    }\n");
+		}
+
+		w.write("}\n");
+	}
+
+	private boolean isSupportedSignalParamType(String descriptor) {
+		return switch (descriptor) {
+			case "boolean", "byte", "short", "int", "long", "float", "double", "java.lang.String" -> true;
+			default -> false;
+		};
+	}
+
+	private String genericTypeForSignal(String descriptor) {
+		return switch (descriptor) {
+			case "boolean" -> "Boolean";
+			case "byte" -> "Byte";
+			case "short" -> "Short";
+			case "int" -> "Integer";
+			case "long" -> "Long";
+			case "float" -> "Float";
+			case "double" -> "Double";
+			case "java.lang.String" -> "String";
+			default -> descriptor.substring(descriptor.lastIndexOf('.') + 1);
+		};
+	}
+
+	private boolean needsSignalImport(String descriptor) {
+		return switch (descriptor) {
+			case "boolean", "byte", "short", "int", "long", "float", "double", "java.lang.String", "void" -> false;
+			default -> true;
+		};
 	}
 
 	private void generateVirtualArgRead(Writer w, ParamTypeInfo param, int index, int totalParamCount)

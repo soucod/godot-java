@@ -17,8 +17,15 @@ import static java.lang.foreign.ValueLayout.JAVA_INT;
  *
  * Array is a Variant built-in type (not an Object), so ALL method dispatch goes
  * through VARIANT_CALL (not classdb_get_method_bind, which is Object-only).
+ *
+ * The type parameter T provides compile-time element type safety. At runtime,
+ * element type metadata is managed by Godot's native Array. Raw type usage
+ * ({@code GodotArray} without type parameters) is backward-compatible.
+ *
+ * @param <T>
+ *            the element type
  */
-public class GodotArray extends RefCounted {
+public class GodotArray<T> extends RefCounted {
 
 	private final OwnedVariant ownedVariant;
 
@@ -46,24 +53,25 @@ public class GodotArray extends RefCounted {
 		this.ownedVariant = ownedVariant;
 	}
 
-	public static GodotArray fromNative(long nativePtr) {
+	public static GodotArray<?> fromNative(long nativePtr) {
 		if (nativePtr == 0)
 			return null;
-		return new GodotArray(nativePtr);
+		return new GodotArray<>(nativePtr);
 	}
 
-	public static GodotArray fromOwnedVariant(MemorySegment variantSeg) {
+	public static GodotArray<?> fromOwnedVariant(MemorySegment variantSeg) {
 		OwnedVariant owned = OwnedVariant.copyOf(variantSeg);
-		return new GodotArray(owned);
+		return new GodotArray<>(owned);
 	}
 
 	/**
 	 * Get element at index via VARIANT_CALL "get".
 	 */
-	public Object get(int index) {
+	@SuppressWarnings("unchecked")
+	public T get(int index) {
 		if (nativeObject == 0)
 			return null;
-		return callVariantMethodReturning("get", index);
+		return (T) callVariantMethodReturning("get", index);
 	}
 
 	/**
@@ -183,8 +191,8 @@ public class GodotArray extends RefCounted {
 		return size() == 0;
 	}
 
-	public static GodotArray fromVariant(MemorySegment variantSeg) {
-		return new GodotArray(variantSeg);
+	public static GodotArray<?> fromVariant(MemorySegment variantSeg) {
+		return new GodotArray<>(variantSeg);
 	}
 
 	// ------------------------------------------------------------------------
@@ -280,11 +288,22 @@ public class GodotArray extends RefCounted {
 
 				int errorCode = errorVar.get(JAVA_INT, 0);
 				if (errorCode != 0) {
+					System.out.println("[GodotArray] VARIANT_CALL " + methodName + " error=" + errorCode);
 					return null;
 				}
 
 				Variant result = new Variant(retVar);
-				Object javaResult = VariantUtils.toObject(result);
+				Object javaResult;
+				try {
+					javaResult = VariantUtils.toObject(result);
+				} catch (Exception e) {
+					System.out.println("[GodotArray] toObject failed for " + methodName + " type=" + result.getType()
+							+ ": " + e.getMessage());
+					javaResult = null;
+				}
+				if (javaResult == null && "get".equals(methodName)) {
+					System.out.println("[GodotArray] get returned null, retType=" + result.getType());
+				}
 				Bridge.destroyVariant(retVar);
 				return javaResult;
 			} finally {

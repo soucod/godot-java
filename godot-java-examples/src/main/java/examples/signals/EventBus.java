@@ -43,13 +43,13 @@ public class EventBus extends Node {
 	public void addScore(int points) {
 		score += points;
 		logger.info("Score updated: {} (emit scoreChanged)", score);
-		emitSignal("scoreChanged", score);
+		new EventBusSignals(this).scoreChanged().emit(score);
 	}
 
 	@GodotMethod
 	public void completeLevel(String name) {
 		logger.info("Level completed: {} with score {} (emit levelCompleted)", name, score);
-		emitSignal("levelCompleted", name, score);
+		new EventBusSignals(this).levelCompleted().emit(name, score);
 	}
 
 	@GodotMethod

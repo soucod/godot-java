@@ -111,6 +111,9 @@ public final class Registry {
 		// Register @Export properties
 		stats.properties = PropertyRegistration.registerProperties(className);
 
+		// Register @ExportGroup/@ExportSubgroup
+		PropertyRegistration.registerGroups(className);
+
 		// Register @Signal signals
 		stats.signals = SignalRegistration.registerSignals(className);
 

@@ -50,22 +50,19 @@ class BridgeArenaTest {
 
 	@Test
 	void allocVariantTrackedInMemoryTracker() {
-		long beforeBytes = org.godot.internal.NativeMemoryTracker.getLiveBytes();
 		long beforeCount = org.godot.internal.NativeMemoryTracker.getLiveAllocationCount();
 
 		Bridge.runScoped(() -> {
 			Bridge.allocVariant();
 			Bridge.allocVariant();
 			Bridge.allocVariant();
+			// Inside scope: live allocations should be +3
+			assertEquals(beforeCount + 3, org.godot.internal.NativeMemoryTracker.getLiveAllocationCount());
 			return null;
 		});
 
-		// After scope closes, tracked allocations should reflect the variant
-		// allocations
-		// The arena is freed so memory is released, but tracker counters show what
-		// happened
-		long afterCount = org.godot.internal.NativeMemoryTracker.getLiveAllocationCount();
-		assertEquals(beforeCount + 3, afterCount);
+		// After scope closes, onFree is called so live count returns to baseline
+		assertEquals(beforeCount, org.godot.internal.NativeMemoryTracker.getLiveAllocationCount());
 	}
 
 	@Test
@@ -74,11 +71,13 @@ class BridgeArenaTest {
 
 		Bridge.runScoped(() -> {
 			Bridge.allocate(100);
+			// Inside scope: live bytes should be +100
+			assertEquals(beforeBytes + 100, org.godot.internal.NativeMemoryTracker.getLiveBytes());
 			return null;
 		});
 
-		long afterBytes = org.godot.internal.NativeMemoryTracker.getLiveBytes();
-		assertEquals(beforeBytes + 100, afterBytes);
+		// After scope closes, onFree is called so live bytes returns to baseline
+		assertEquals(beforeBytes, org.godot.internal.NativeMemoryTracker.getLiveBytes());
 	}
 
 	@Test

@@ -2,7 +2,6 @@ package com.godot.codegen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -55,28 +54,38 @@ class TypedAbiModelTest {
 	}
 
 	@Test
-	void unsupportedTypedCollectionsRemainUnmodeled() {
-		assertNull(TypedAbiModel.descriptor("typedarray::RID", null));
-		assertNull(TypedAbiModel.descriptor("typeddictionary::String;int", null));
-		assertFalse(TypedAbiModel.descriptor("Callable", null).supportsReturn());
-		assertFalse(TypedAbiModel.descriptor("Signal", null).supportsReturn());
+	void typedCollectionsUseGenericArrayDictionaryDescriptors() {
+		TypedAbiModel.Descriptor ridArray = TypedAbiModel.descriptor("typedarray::RID", null);
+		assertTrue(ridArray.supportsReturn());
+		assertTrue(ridArray.supportsArgument());
+		assertEquals("Array", ridArray.returnHelperSuffix());
+		assertEquals("typedArrayArg(rids)", ridArray.arg("rids"));
+		assertTrue(ridArray.returnCompatibleWithProperty("GodotArray"));
+		assertTrue(ridArray.returnCompatibleWithProperty("GodotArray<Long>"));
+
+		TypedAbiModel.Descriptor dict = TypedAbiModel.descriptor("typeddictionary::String;int", null);
+		assertTrue(dict.supportsReturn());
+		assertTrue(dict.supportsArgument());
+		assertEquals("Dictionary", dict.returnHelperSuffix());
+		assertEquals("typedDictionaryArg(data)", dict.arg("data"));
+		assertTrue(dict.returnCompatibleWithProperty("GodotDictionary"));
+		assertTrue(dict.returnCompatibleWithProperty("GodotDictionary<String, Long>"));
 	}
 
 	@Test
-	void selectedTypedArrayReturnsAreModeledWithoutArgumentSupport() {
+	void typedArrayDescriptorsSupportReturnAndArgument() {
 		TypedAbiModel.Descriptor names = TypedAbiModel.descriptor("typedarray::StringName", null);
 		assertTrue(names.supportsReturn());
-		assertFalse(names.supportsArgument());
-		assertEquals("TypedStringArray", names.returnHelperSuffix());
-		assertTrue(names.returnCompatibleWithProperty("String[]"));
-		assertFalse(names.argumentCompatibleWithProperty("String[]"));
+		assertTrue(names.supportsArgument());
+		assertEquals("Array", names.returnHelperSuffix());
+		assertEquals("typedArrayArg(names)", names.arg("names"));
+		assertTrue(names.returnCompatibleWithProperty("GodotArray<String>"));
 
 		TypedAbiModel.Descriptor ints = TypedAbiModel.descriptor("typedarray::int", null);
 		assertTrue(ints.supportsReturn());
-		assertFalse(ints.supportsArgument());
-		assertEquals("TypedIntArray", ints.returnHelperSuffix());
-		assertTrue(ints.returnCompatibleWithProperty("long[]"));
-		assertFalse(ints.argumentCompatibleWithProperty("long[]"));
+		assertTrue(ints.supportsArgument());
+		assertEquals("Array", ints.returnHelperSuffix());
+		assertTrue(ints.returnCompatibleWithProperty("GodotArray<Long>"));
 	}
 
 	@Test

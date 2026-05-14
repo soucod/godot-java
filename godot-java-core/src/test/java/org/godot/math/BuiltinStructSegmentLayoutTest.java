@@ -28,14 +28,13 @@ class BuiltinStructSegmentLayoutTest {
 		assertRect2(new Rect2(1.25, -2.5, 3.75, 4.5),
 				roundTrip(32, new Rect2(1.25, -2.5, 3.75, 4.5), Rect2::fromSegment));
 		assertRect2i(new Rect2i(1, -2, 3, 4), roundTrip(16, new Rect2i(1, -2, 3, 4), Rect2i::fromSegment));
-		assertColor(new Color(0.25, 0.5, 0.75, 1.0), roundTrip(16, new Color(0.25, 0.5, 0.75, 1.0),
-				Color::fromSegment));
+		assertColor(new Color(0.25, 0.5, 0.75, 1.0),
+				roundTrip(16, new Color(0.25, 0.5, 0.75, 1.0), Color::fromSegment));
 	}
 
 	@Test
 	void transformLayoutsRoundTripThroughNativeSegments() {
-		Transform2D transform2D = new Transform2D(new Vector2(1.0, 2.0), new Vector2(3.0, 4.0),
-				new Vector2(5.0, 6.0));
+		Transform2D transform2D = new Transform2D(new Vector2(1.0, 2.0), new Vector2(3.0, 4.0), new Vector2(5.0, 6.0));
 		assertTransform2D(transform2D, roundTrip(48, transform2D, Transform2D::fromSegment));
 
 		Basis basis = new Basis(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
@@ -52,8 +51,8 @@ class BuiltinStructSegmentLayoutTest {
 
 	@Test
 	void planeQuaternionAndAabbLayoutsRoundTripThroughNativeSegments() {
-		assertPlane(new Plane(1.0, -2.0, 3.0, -4.0), roundTrip(32, new Plane(1.0, -2.0, 3.0, -4.0),
-				Plane::fromSegment));
+		assertPlane(new Plane(1.0, -2.0, 3.0, -4.0),
+				roundTrip(32, new Plane(1.0, -2.0, 3.0, -4.0), Plane::fromSegment));
 		assertQuaternion(new Quaternion(1.0, -2.0, 3.0, -4.0),
 				roundTrip(32, new Quaternion(1.0, -2.0, 3.0, -4.0), Quaternion::fromSegment));
 		assertAabb(new AABB(1.0, -2.0, 3.0, 4.0, 5.0, 6.0),

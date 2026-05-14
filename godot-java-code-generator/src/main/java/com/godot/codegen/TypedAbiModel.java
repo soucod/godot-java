@@ -6,15 +6,14 @@ import java.util.Set;
 final class TypedAbiModel {
 
 	static final Set<String> BUILTIN_STRUCT_TYPES = Set.of("Vector2", "Vector2i", "Rect2", "Rect2i", "Vector3",
-			"Vector3i", "Transform2D", "Vector4", "Vector4i", "Plane", "Quaternion", "AABB", "Basis",
-			"Transform3D", "Projection", "Color");
+			"Vector3i", "Transform2D", "Vector4", "Vector4i", "Plane", "Quaternion", "AABB", "Basis", "Transform3D",
+			"Projection", "Color");
 
 	private static final Map<String, Descriptor> EXACT_TYPES = Map.ofEntries(
 			entry("bool", new Descriptor("Bool", param -> "java.lang.Boolean.valueOf(" + param + ")", "boolean")),
 			entry("RID", new Descriptor("Rid", param -> "java.lang.Long.valueOf(" + param + ")", "long")),
 			entry("String", new Descriptor("String", param -> "typedStringArg(" + param + ")", "String")),
-			entry("StringName",
-					new Descriptor("StringName", param -> "typedStringNameArg(" + param + ")", "String")),
+			entry("StringName", new Descriptor("StringName", param -> "typedStringNameArg(" + param + ")", "String")),
 			entry("NodePath", new Descriptor("NodePath", param -> "typedNodePathArg(" + param + ")", "String")),
 			entry("Variant", new Descriptor("Variant", param -> "typedVariantArg(" + param + ")", null)),
 			entry("Array", new Descriptor("Array", param -> "typedArrayArg(" + param + ")", "GodotArray")),
@@ -23,8 +22,7 @@ final class TypedAbiModel {
 			entry("Callable", new Descriptor(null, param -> "typedCallableArg(" + param + ")", "Callable")),
 			entry("Signal", new Descriptor(null, param -> "typedSignalArg(" + param + ")", "Signal")),
 			entry("PackedByteArray",
-					new Descriptor("PackedByteArray", param -> "typedPackedByteArrayArg(" + param + ")",
-							"byte[]")),
+					new Descriptor("PackedByteArray", param -> "typedPackedByteArrayArg(" + param + ")", "byte[]")),
 			entry("PackedInt32Array",
 					new Descriptor("PackedInt32Array", param -> "typedPackedInt32ArrayArg(" + param + ")", "int[]")),
 			entry("PackedInt64Array",
@@ -44,9 +42,8 @@ final class TypedAbiModel {
 			entry("PackedVector3Array",
 					new Descriptor("PackedVector3Array", param -> "typedPackedVector3ArrayArg(" + param + ")",
 							"double[][]")),
-			entry("PackedColorArray",
-					new Descriptor("PackedColorArray", param -> "typedPackedColorArrayArg(" + param + ")",
-							"double[][]")));
+			entry("PackedColorArray", new Descriptor("PackedColorArray",
+					param -> "typedPackedColorArrayArg(" + param + ")", "double[][]")));
 
 	private TypedAbiModel() {
 	}
@@ -60,6 +57,9 @@ final class TypedAbiModel {
 		}
 		if (type.startsWith("typedarray::")) {
 			return typedArrayDescriptor(type.substring("typedarray::".length()));
+		}
+		if (type.startsWith("typeddictionary::")) {
+			return new Descriptor("Dictionary", param -> "typedDictionaryArg(" + param + ")", "GodotDictionary");
 		}
 		if ("int".equals(type)) {
 			return integerDescriptor(meta);
@@ -102,13 +102,7 @@ final class TypedAbiModel {
 	}
 
 	private static Descriptor typedArrayDescriptor(String elementType) {
-		if ("String".equals(elementType) || "StringName".equals(elementType) || "NodePath".equals(elementType)) {
-			return new Descriptor("TypedStringArray", null, "String[]", null);
-		}
-		if ("int".equals(elementType)) {
-			return new Descriptor("TypedIntArray", null, "long[]", null);
-		}
-		return null;
+		return new Descriptor("Array", param -> "typedArrayArg(" + param + ")", "GodotArray");
 	}
 
 	private static Descriptor floatDescriptor(String meta) {
@@ -162,6 +156,12 @@ final class TypedAbiModel {
 			if ("float".equals(returnPropertyJavaType)) {
 				return "float".equals(javaType) || "double".equals(javaType);
 			}
+			if ("GodotArray".equals(returnPropertyJavaType)) {
+				return javaType.startsWith("GodotArray");
+			}
+			if ("GodotDictionary".equals(returnPropertyJavaType)) {
+				return javaType.startsWith("GodotDictionary");
+			}
 			return returnPropertyJavaType.equals(javaType);
 		}
 
@@ -179,6 +179,12 @@ final class TypedAbiModel {
 			}
 			if ("float".equals(argumentPropertyJavaType) || "double".equals(argumentPropertyJavaType)) {
 				return "float".equals(javaType) || "double".equals(javaType);
+			}
+			if ("GodotArray".equals(argumentPropertyJavaType)) {
+				return javaType.startsWith("GodotArray");
+			}
+			if ("GodotDictionary".equals(argumentPropertyJavaType)) {
+				return javaType.startsWith("GodotDictionary");
 			}
 			return argumentPropertyJavaType.equals(javaType);
 		}

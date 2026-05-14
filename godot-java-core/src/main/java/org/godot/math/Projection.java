@@ -41,8 +41,9 @@ public final class Projection {
 	}
 
 	public static Projection fromSegment(MemorySegment segment) {
-		return new Projection(new Vector4(segment.get(JAVA_FLOAT, 0), segment.get(JAVA_FLOAT, 4),
-				segment.get(JAVA_FLOAT, 8), segment.get(JAVA_FLOAT, 12)),
+		return new Projection(
+				new Vector4(segment.get(JAVA_FLOAT, 0), segment.get(JAVA_FLOAT, 4), segment.get(JAVA_FLOAT, 8),
+						segment.get(JAVA_FLOAT, 12)),
 				new Vector4(segment.get(JAVA_FLOAT, 16), segment.get(JAVA_FLOAT, 20), segment.get(JAVA_FLOAT, 24),
 						segment.get(JAVA_FLOAT, 28)),
 				new Vector4(segment.get(JAVA_FLOAT, 32), segment.get(JAVA_FLOAT, 36), segment.get(JAVA_FLOAT, 40),

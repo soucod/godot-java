@@ -52,7 +52,7 @@ public class JavaClassGenerator {
 		addConvenienceMethods(classBuilder, classInfo);
 
 		JavaFile.Builder fileBuilder = JavaFile.builder(packageName, classBuilder.build()).skipJavaLangImports(false)
-				.indent("\t");
+				.indent("	");
 		return fileBuilder;
 	}
 
@@ -182,7 +182,8 @@ public class JavaClassGenerator {
 							"type")
 					.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class).addMember("value", "$S", "unchecked")
 							.build())
-					.addStatement("$T node = instantiate()", nodeType).addStatement("if (node == null) return null")
+					.addStatement("$T node = instantiate(GenEditState.GEN_EDIT_STATE_DISABLED)", nodeType)
+					.addStatement("if (node == null) return null")
 					.addStatement("return ($T) node", TypeVariableName.get("T")).build());
 		}
 	}
@@ -312,6 +313,15 @@ public class JavaClassGenerator {
 				enumBuilder.addEnumConstant(ev.name(), TypeSpec.anonymousClassBuilder("$L", literal).build());
 			}
 
+			// Add fromValue() for non-bitfield enums
+			if (!enumInfo.isBitfield()) {
+				enumBuilder.addMethod(MethodSpec.methodBuilder("fromValue")
+						.addModifiers(Modifier.PUBLIC, Modifier.STATIC).returns(ClassName.get("", enumInfo.name()))
+						.addParameter(int.class, "value").beginControlFlow("for (var e : values())")
+						.addStatement("if (e.value == value) return e").endControlFlow().addStatement("return null")
+						.build());
+			}
+
 			builder.addType(enumBuilder.build());
 		}
 	}
@@ -361,7 +371,7 @@ public class JavaClassGenerator {
 				continue;
 			}
 
-			String returnType = getReturnType(method);
+			String returnType = getEnumAwareReturnType(method);
 
 			// Build parameter list
 			List<ParameterSpec> params = new ArrayList<>();
@@ -369,7 +379,7 @@ public class JavaClassGenerator {
 			List<String> paramTypes = new ArrayList<>();
 			for (int i = 0; i < method.arguments().size(); i++) {
 				ArgInfo arg = method.arguments().get(i);
-				String javaType = TypeMapper.getJavaParamType(arg.type(), arg.meta());
+				String javaType = getEnumAwareParamType(arg);
 				String javaName = toJavaParamName(arg.name());
 				params.add(ParameterSpec.builder(toTypeName(javaType), javaName).build());
 				paramNames.add(javaName);
@@ -405,19 +415,39 @@ public class JavaClassGenerator {
 					methodBuilder.returns(toTypeName(returnType));
 					String typedHelper = TypedCallSupport.helperName(method, true);
 					if (typedHelper != null && TypedCallSupport.argumentsSupported(method)) {
-						methodBuilder.addStatement("return $L($S, $S, $L$L$L)", typedHelper, classInfo.name(),
-								method.name(), method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
-								TypedCallSupport.callArgs(method, paramNames));
+						if (isEnumReturnType(method)) {
+							methodBuilder.addStatement("return $T.fromValue($L($S, $S, $L$L$L))",
+									toTypeName(returnType), typedHelper, classInfo.name(), method.name(),
+									method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
+									hasEnumParams(method)
+											? buildEnumAwareCallArgs(method, paramNames)
+											: TypedCallSupport.callArgs(method, paramNames));
+						} else {
+							methodBuilder.addStatement("return $L($S, $S, $L$L$L)", typedHelper, classInfo.name(),
+									method.name(), method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
+									hasEnumParams(method)
+											? buildEnumAwareCallArgs(method, paramNames)
+											: TypedCallSupport.callArgs(method, paramNames));
+						}
 					} else {
-						methodBuilder.addStatement("return ($T) callStatic($S, $S, $L$L)", toTypeName(returnType),
-								classInfo.name(), method.name(), method.hash() + "L", callArgs);
+						if (isEnumReturnType(method)) {
+							methodBuilder.addStatement(
+									"return $T.fromValue(((java.lang.Number) callStatic($S, $S, $L$L)).intValue())",
+									toTypeName(returnType), classInfo.name(), method.name(), method.hash() + "L",
+									callArgs);
+						} else {
+							methodBuilder.addStatement("return ($T) callStatic($S, $S, $L$L)", toTypeName(returnType),
+									classInfo.name(), method.name(), method.hash() + "L", callArgs);
+						}
 					}
 				} else {
 					String typedHelper = TypedCallSupport.helperName(method, true);
 					if (typedHelper != null && TypedCallSupport.argumentsSupported(method)) {
 						methodBuilder.addStatement("$L($S, $S, $L$L$L)", typedHelper, classInfo.name(), method.name(),
 								method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
-								TypedCallSupport.callArgs(method, paramNames));
+								hasEnumParams(method)
+										? buildEnumAwareCallArgs(method, paramNames)
+										: TypedCallSupport.callArgs(method, paramNames));
 					} else {
 						methodBuilder.addStatement("callStatic($S, $S, $L$L)", classInfo.name(), method.name(),
 								method.hash() + "L", callArgs);
@@ -429,19 +459,39 @@ public class JavaClassGenerator {
 					methodBuilder.returns(toTypeName(returnType));
 					String typedHelper = TypedCallSupport.helperName(method, false);
 					if (typedHelper != null && TypedCallSupport.argumentsSupported(method)) {
-						methodBuilder.addStatement("return $L($S, $S, $L$L$L)", typedHelper, classInfo.name(),
-								method.name(), method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
-								TypedCallSupport.callArgs(method, paramNames));
+						if (isEnumReturnType(method)) {
+							methodBuilder.addStatement("return $T.fromValue($L($S, $S, $L$L$L))",
+									toTypeName(returnType), typedHelper, classInfo.name(), method.name(),
+									method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
+									hasEnumParams(method)
+											? buildEnumAwareCallArgs(method, paramNames)
+											: TypedCallSupport.callArgs(method, paramNames));
+						} else {
+							methodBuilder.addStatement("return $L($S, $S, $L$L$L)", typedHelper, classInfo.name(),
+									method.name(), method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
+									hasEnumParams(method)
+											? buildEnumAwareCallArgs(method, paramNames)
+											: TypedCallSupport.callArgs(method, paramNames));
+						}
 					} else {
-						methodBuilder.addStatement("return ($T) callEngine($S, $S, $L$L)", toTypeName(returnType),
-								classInfo.name(), method.name(), method.hash() + "L", callArgs);
+						if (isEnumReturnType(method)) {
+							methodBuilder.addStatement(
+									"return $T.fromValue(((java.lang.Number) callEngine($S, $S, $L$L)).intValue())",
+									toTypeName(returnType), classInfo.name(), method.name(), method.hash() + "L",
+									callArgs);
+						} else {
+							methodBuilder.addStatement("return ($T) callEngine($S, $S, $L$L)", toTypeName(returnType),
+									classInfo.name(), method.name(), method.hash() + "L", callArgs);
+						}
 					}
 				} else {
 					String typedHelper = TypedCallSupport.helperName(method, false);
 					if (typedHelper != null && TypedCallSupport.argumentsSupported(method)) {
 						methodBuilder.addStatement("$L($S, $S, $L$L$L)", typedHelper, classInfo.name(), method.name(),
 								method.hash() + "L", TypedCallSupport.returnMetadataArgs(method),
-								TypedCallSupport.callArgs(method, paramNames));
+								hasEnumParams(method)
+										? buildEnumAwareCallArgs(method, paramNames)
+										: TypedCallSupport.callArgs(method, paramNames));
 					} else {
 						methodBuilder.addStatement("callEngine($S, $S, $L$L)", classInfo.name(), method.name(),
 								method.hash() + "L", callArgs);
@@ -578,6 +628,11 @@ public class JavaClassGenerator {
 				break;
 		}
 		if (dv.matches("-?\\d+")) {
+			// Enum types (ClassName.EnumName format, not fully qualified)
+			if (javaType.contains(".") && !javaType.startsWith("java.")
+					&& javaType.indexOf('.') == javaType.lastIndexOf('.')) {
+				return javaType + ".fromValue(" + dv + ")";
+			}
 			switch (javaType) {
 				case "java.math.BigInteger" :
 					return "java.math.BigInteger.valueOf(" + dv + "L)";
@@ -813,9 +868,14 @@ public class JavaClassGenerator {
 			Map.entry("Projection", "org.godot.math"), Map.entry("Color", "org.godot.math"),
 			// Core package
 			Map.entry("Callable", "org.godot.core"), Map.entry("Signal", "org.godot.core"),
-			Map.entry("GodotString", "org.godot.core"), Map.entry("GodotStringName", "org.godot.core"),
-			Map.entry("GodotVariant", "org.godot.core"), // Collection package
+			Map.entry("Variant", "org.godot.core"), Map.entry("GodotString", "org.godot.core"),
+			Map.entry("GodotStringName", "org.godot.core"), Map.entry("GodotVariant", "org.godot.core"), // Collection
+																											// package
 			Map.entry("GodotArray", "org.godot.collection"), Map.entry("GodotDictionary", "org.godot.collection"));
+
+	private static final Map<String, String> JAVA_BOXED_TYPES = Map.of("Boolean", "java.lang", "Byte", "java.lang",
+			"Short", "java.lang", "Integer", "java.lang", "Long", "java.lang", "Float", "java.lang", "Double",
+			"java.lang", "String", "java.lang");
 
 	private ClassName superClassRef(String godotParentName) {
 		// All engine classes (Object, RefCounted, Node, etc.) are in org.godot.node
@@ -831,6 +891,17 @@ public class JavaClassGenerator {
 			return TypeName.get(java.lang.Object.class);
 		}
 
+		// Handle parameterized types like "GodotArray<String>" or
+		// "GodotDictionary<Long, String>"
+		int lt = type.indexOf('<');
+		if (lt > 0 && type.endsWith(">")) {
+			String rawType = type.substring(0, lt);
+			String params = type.substring(lt + 1, type.length() - 1);
+			ClassName raw = resolveClassName(rawType);
+			List<TypeName> typeArgs = parseTypeArgs(params);
+			return ParameterizedTypeName.get(raw, typeArgs.toArray(new TypeName[0]));
+		}
+
 		if (type.endsWith("[]")) {
 			String component = type.substring(0, type.length() - 2);
 			return ArrayTypeName.of(toTypeName(component));
@@ -841,7 +912,53 @@ public class JavaClassGenerator {
 			return ClassName.get(CROSS_PACKAGE_TYPES.get(type), type);
 		}
 
+		// Java boxed primitive types (Long, String, etc.) used as generic type
+		// arguments
+		if (JAVA_BOXED_TYPES.containsKey(type)) {
+			return ClassName.get(JAVA_BOXED_TYPES.get(type), type);
+		}
+
+		// Nested types (enum references): "Tree.SelectMode" ->
+		// ClassName.get(packageName, "Tree", "SelectMode")
+		int dot = type.indexOf('.');
+		if (dot > 0 && !type.startsWith("GodotArray") && !type.startsWith("GodotDictionary")) {
+			String outer = type.substring(0, dot);
+			String inner = type.substring(dot + 1);
+			String outerPkg = CROSS_PACKAGE_TYPES.getOrDefault(outer, packageName);
+			return ClassName.get(outerPkg, outer, inner);
+		}
+
 		return ClassName.get(packageName, type);
+	}
+
+	private ClassName resolveClassName(String type) {
+		if (CROSS_PACKAGE_TYPES.containsKey(type)) {
+			return ClassName.get(CROSS_PACKAGE_TYPES.get(type), type);
+		}
+		// Java boxed primitive types used as generic arguments
+		if (JAVA_BOXED_TYPES.containsKey(type)) {
+			return ClassName.get(JAVA_BOXED_TYPES.get(type), type);
+		}
+		return ClassName.get(packageName, type);
+	}
+
+	private List<TypeName> parseTypeArgs(String params) {
+		List<TypeName> args = new ArrayList<>();
+		int depth = 0;
+		int start = 0;
+		for (int i = 0; i < params.length(); i++) {
+			char c = params.charAt(i);
+			if (c == '<')
+				depth++;
+			else if (c == '>')
+				depth--;
+			else if (c == ',' && depth == 0) {
+				args.add(toTypeName(params.substring(start, i).trim()));
+				start = i + 1;
+			}
+		}
+		args.add(toTypeName(params.substring(start).trim()));
+		return args;
 	}
 
 	// ------------------------------------------------------------------
@@ -942,6 +1059,80 @@ public class JavaClassGenerator {
 			return "Object";
 		}
 		return TypeMapper.toJavaType(godotType);
+	}
+
+	private boolean isEnumReturnType(MethodInfo method) {
+		return resolveEnumType(method.returnType()) != null;
+	}
+
+	private String resolveEnumType(String godotType) {
+		if (godotType == null || !godotType.startsWith("enum::")) {
+			return null;
+		}
+		String enumRef = godotType.substring("enum::".length());
+		int dot = enumRef.indexOf('.');
+		if (dot <= 0) {
+			return null;
+		}
+		String className = enumRef.substring(0, dot);
+		if (!classMap.containsKey(className)) {
+			return null;
+		}
+		return enumRef;
+	}
+
+	private String getEnumAwareParamType(ArgInfo arg) {
+		String resolved = resolveEnumType(arg.type());
+		if (resolved != null) {
+			return resolved;
+		}
+		return TypeMapper.getJavaParamType(arg.type(), arg.meta());
+	}
+
+	private String getEnumAwareReturnType(MethodInfo method) {
+		if (method.returnType() == null || method.returnType().isEmpty()) {
+			return "void";
+		}
+		String resolved = resolveEnumType(method.returnType());
+		if (resolved != null) {
+			return resolved;
+		}
+		return getReturnType(method);
+	}
+
+	private boolean hasEnumParams(MethodInfo method) {
+		for (ArgInfo arg : method.arguments()) {
+			if (resolveEnumType(arg.type()) != null)
+				return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Build typed call args, using .value for enum-typed parameters.
+	 */
+	private String buildEnumAwareCallArgs(MethodInfo method, List<String> paramNames) {
+		if (method.arguments().isEmpty()) {
+			return "";
+		}
+		StringBuilder args = new StringBuilder();
+		for (int i = 0; i < method.arguments().size(); i++) {
+			args.append(", ");
+			ArgInfo arg = method.arguments().get(i);
+			if (resolveEnumType(arg.type()) != null) {
+				// Resolved enum type: extract int value
+				args.append(paramNames.get(i)).append(".value");
+			} else {
+				// Non-enum: use TypedCallSupport
+				String expr = TypedCallSupport.argExpression(arg, paramNames.get(i));
+				if (expr != null) {
+					args.append(expr);
+				} else {
+					return null; // unsupported arg type
+				}
+			}
+		}
+		return args.toString();
 	}
 
 	private String boxToObject(String varName, String javaType) {

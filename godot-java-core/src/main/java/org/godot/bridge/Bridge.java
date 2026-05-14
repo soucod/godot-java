@@ -65,7 +65,12 @@ public final class Bridge {
 	 * Combined scope context: temporary arena + call depth. Replaces the former
 	 * CALL_ARENA + CALL_DEPTH with a single ScopedValue lookup.
 	 */
-	record ScopeContext(Arena arena, int depth) {
+	record ScopeContext(Arena arena, int depth, java.util.concurrent.atomic.AtomicLong allocatedBytes,
+			java.util.concurrent.atomic.AtomicLong allocationCount) {
+		ScopeContext(Arena arena, int depth) {
+			this(arena, depth, new java.util.concurrent.atomic.AtomicLong(0),
+					new java.util.concurrent.atomic.AtomicLong(0));
+		}
 	}
 
 	private static final ScopedValue<ScopeContext> SCOPE_CTX = ScopedValue.newInstance();
@@ -250,7 +255,9 @@ public final class Bridge {
 	 * Allocate a Godot Variant from the active arena.
 	 */
 	public static MemorySegment allocVariant() {
-		org.godot.internal.NativeMemoryTracker.onAllocate((int) Variant.SIZE);
+		int size = (int) Variant.SIZE;
+		org.godot.internal.NativeMemoryTracker.onAllocate(size);
+		trackScopeAllocation(size);
 		return arena().allocate(Variant.SIZE, 8);
 	}
 
@@ -261,7 +268,16 @@ public final class Bridge {
 	 */
 	public static MemorySegment allocate(long bytes) {
 		org.godot.internal.NativeMemoryTracker.onAllocate(bytes);
+		trackScopeAllocation(bytes);
 		return arena().allocate(bytes, 8);
+	}
+
+	private static void trackScopeAllocation(long bytes) {
+		ScopeContext ctx = SCOPE_CTX.orElse(NO_SCOPE);
+		if (ctx != NO_SCOPE && ctx.allocatedBytes() != null) {
+			ctx.allocatedBytes().addAndGet(bytes);
+			ctx.allocationCount().incrementAndGet();
+		}
 	}
 
 	/**
@@ -292,6 +308,11 @@ public final class Bridge {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		} finally {
+			long freed = ctx.allocatedBytes().get();
+			long count = ctx.allocationCount().get();
+			if (count > 0) {
+				org.godot.internal.NativeMemoryTracker.onFree(freed, count);
+			}
 			scope.close();
 		}
 	}
@@ -312,6 +333,11 @@ public final class Bridge {
 		try {
 			ScopedValue.where(SCOPE_CTX, ctx).run(action);
 		} finally {
+			long freed = ctx.allocatedBytes().get();
+			long count = ctx.allocationCount().get();
+			if (count > 0) {
+				org.godot.internal.NativeMemoryTracker.onFree(freed, count);
+			}
 			scope.close();
 		}
 	}

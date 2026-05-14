@@ -13,11 +13,17 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
  * Godot Dictionary type. A key-value container with Variant keys and values.
  * Extends RefCounted since Godot Dictionaries are reference-counted objects.
  *
- * ```java GodotDictionary dict = new GodotDictionary(nativePtr);
- * dict.put("key", 42); Object val = dict.get("key"); int size = dict.size();
- * ```
+ * The type parameters K and V provide compile-time type safety for keys and
+ * values. At runtime, type metadata is managed by Godot's native Dictionary.
+ * Raw type usage ({@code GodotDictionary} without type parameters) is
+ * backward-compatible.
+ *
+ * @param <K>
+ *            the key type
+ * @param <V>
+ *            the value type
  */
-public class GodotDictionary extends RefCounted {
+public class GodotDictionary<K, V> extends RefCounted {
 
 	private final OwnedVariant ownedVariant;
 
@@ -42,9 +48,9 @@ public class GodotDictionary extends RefCounted {
 		this.ownedVariant = ownedVariant;
 	}
 
-	public static GodotDictionary fromOwnedVariant(MemorySegment variantSeg) {
+	public static GodotDictionary<?, ?> fromOwnedVariant(MemorySegment variantSeg) {
 		OwnedVariant owned = OwnedVariant.copyOf(variantSeg);
-		return new GodotDictionary(owned);
+		return new GodotDictionary<>(owned);
 	}
 
 	/**
@@ -56,16 +62,18 @@ public class GodotDictionary extends RefCounted {
 	 */
 	// Override Object.get(String) to avoid shadowing by the generated property
 	// getter
+	@SuppressWarnings("unchecked")
 	@Override
-	public Object get(String key) {
-		return get((Object) key);
+	public V get(String key) {
+		return (V) get((Object) key);
 	}
 
-	public Object get(Object key) {
+	@SuppressWarnings("unchecked")
+	public V get(Object key) {
 		if (nativeObject == 0)
 			return null;
 
-		return Bridge.runScoped(() -> {
+		return (V) Bridge.runScoped(() -> {
 			MemorySegment dictPtrBuf = Bridge.allocate(ADDRESS.byteSize());
 			dictPtrBuf.set(ADDRESS, 0, MemorySegment.ofAddress(nativeObject));
 			Variant keyVar = VariantUtils.fromObject(key);

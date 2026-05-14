@@ -76,13 +76,13 @@ public class SnakeGame extends Node2D {
 		double offsetY = (648 - GRID_H * CELL_SIZE) / 2.0;
 		container = Node2D.create();
 		container.setPosition(new Vector2(offsetX, offsetY));
-		addChild(container, false, 0);
+		addChild(container);
 
 		// Grid background
 		ColorRect bg = ColorRect.create();
 		bg.setColor(BG_COLOR);
 		bg.setSize(new Vector2(GRID_W * CELL_SIZE, GRID_H * CELL_SIZE));
-		container.addChild(bg, false, 0);
+		container.addChild(bg);
 
 		// Grid lines (horizontal)
 		for (int y = 0; y <= GRID_H; y++) {
@@ -90,7 +90,7 @@ public class SnakeGame extends Node2D {
 			line.setColor(GRID_LINE_COLOR);
 			line.setSize(new Vector2(GRID_W * CELL_SIZE, 1));
 			line.setPosition(new Vector2(0, y * CELL_SIZE));
-			container.addChild(line, false, 0);
+			container.addChild(line);
 		}
 		// Grid lines (vertical)
 		for (int x = 0; x <= GRID_W; x++) {
@@ -98,20 +98,20 @@ public class SnakeGame extends Node2D {
 			line.setColor(GRID_LINE_COLOR);
 			line.setSize(new Vector2(1, GRID_H * CELL_SIZE));
 			line.setPosition(new Vector2(x * CELL_SIZE, 0));
-			container.addChild(line, false, 0);
+			container.addChild(line);
 		}
 
 		// Food rect
 		foodRect = ColorRect.create();
 		foodRect.setColor(FOOD_COLOR);
 		foodRect.setSize(new Vector2(CELL_SIZE - 2, CELL_SIZE - 2));
-		container.addChild(foodRect, false, 0);
+		container.addChild(foodRect);
 
 		// Score label
 		scoreLabel = Label.create();
 		scoreLabel.addThemeFontSizeOverride("font_size", 24);
 		scoreLabel.setPosition(new Vector2(10, 10));
-		addChild(scoreLabel, false, 0);
+		addChild(scoreLabel);
 
 		// Message label
 		messageLabel = Label.create();
@@ -120,7 +120,7 @@ public class SnakeGame extends Node2D {
 		messageLabel.setPosition(new Vector2(1152 / 2 - 200, 648 / 2 - 20));
 		messageLabel.setSize(new Vector2(400, 40));
 		messageLabel.setVisible(false);
-		addChild(messageLabel, false, 0);
+		addChild(messageLabel);
 
 		restart();
 		updateScoreDisplay();
@@ -183,7 +183,7 @@ public class SnakeGame extends Node2D {
 		if (newX == foodX && newY == foodY) {
 			score++;
 			growing = true;
-			emitSignal("onScoreChanged", score);
+			new SnakeGameSignals(this).onScoreChanged().emit(score);
 			spawnFood();
 			updateScoreDisplay();
 		}
@@ -202,7 +202,7 @@ public class SnakeGame extends Node2D {
 		while (segmentRects.size() < segments.size()) {
 			ColorRect rect = ColorRect.create();
 			rect.setSize(new Vector2(CELL_SIZE - 2, CELL_SIZE - 2));
-			container.addChild(rect, false, 0);
+			container.addChild(rect);
 			segmentRects.add(rect);
 		}
 		while (segmentRects.size() > segments.size()) {
@@ -235,7 +235,7 @@ public class SnakeGame extends Node2D {
 
 	private void endGame() {
 		gameOver = true;
-		emitSignal("onGameOver", score);
+		new SnakeGameSignals(this).onGameOver().emit(score);
 		messageLabel.setText("Game Over! Score: " + score + "  [Space to restart]");
 		messageLabel.setVisible(true);
 		logger.info("Game Over! Final score: {}", score);

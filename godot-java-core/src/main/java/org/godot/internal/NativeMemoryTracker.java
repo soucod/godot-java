@@ -30,6 +30,11 @@ public final class NativeMemoryTracker {
 		liveBytes.addAndGet(-size);
 	}
 
+	public static void onFree(long size, long count) {
+		liveAllocations.addAndGet(-count);
+		liveBytes.addAndGet(-size);
+	}
+
 	public static String getStats() {
 		return String.format(
 				"NativeMemoryTracker{totalAllocations=%d, totalBytes=%d, liveAllocations=%d, liveBytes=%d}",

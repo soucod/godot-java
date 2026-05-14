@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.godot.annotation.GodotClass;
 import org.godot.annotation.GodotMethod;
+import org.godot.collection.GodotArray;
 import org.godot.node.Node;
 
 /**
@@ -22,19 +23,19 @@ public class Spawner extends Node {
 		// Build initial node tree
 		Node player = Node.create();
 		player.setName("Player");
-		addChild(player, false, 0);
+		addChild(player);
 
 		Node enemies = Node.create();
 		enemies.setName("Enemies");
-		addChild(enemies, false, 0);
+		addChild(enemies);
 
 		Node enemy1 = Node.create();
 		enemy1.setName("Enemy1");
-		enemies.addChild(enemy1, false, 0);
+		enemies.addChild(enemy1);
 
 		Node enemy2 = Node.create();
 		enemy2.setName("Enemy2");
-		enemies.addChild(enemy2, false, 0);
+		enemies.addChild(enemy2);
 
 		logger.info("Initial tree:");
 		describeTree();
@@ -49,11 +50,11 @@ public class Spawner extends Node {
 
 	@GodotMethod
 	public void describeTree() {
-		Node[] children = getChildren(false);
+		GodotArray<Node> children = getChildren(false);
 		logger.info("--- Scene Tree ---");
-		logger.info("Spawner (children: {})", children.length);
-		for (int i = 0; i < children.length; i++) {
-			Node child = children[i];
+		logger.info("Spawner (children: {})", children.size());
+		for (int i = 0; i < children.size(); i++) {
+			Node child = children.get(i);
 			logger.info("  [{}] ptr={} valid={}", i, Long.toHexString(child.getPtr()), child.isValid());
 		}
 		logger.info("--- End ---");
@@ -63,7 +64,7 @@ public class Spawner extends Node {
 	public void spawnChild(String name) {
 		Node child = Node.create();
 		child.setName(name);
-		addChild(child, false, 0);
+		addChild(child);
 		logger.info("Spawned child: {}", name);
 	}
 }

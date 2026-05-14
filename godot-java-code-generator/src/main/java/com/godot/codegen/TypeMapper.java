@@ -51,6 +51,11 @@ public class TypeMapper {
 		TYPE_MAP.put("PackedVector3Array", "double[][]");
 		TYPE_MAP.put("PackedColorArray", "double[][]");
 
+		// Typed arrays (legacy flat-array entries replaced by generic GodotArray<T>)
+		TYPE_MAP.put("typedarray::String", "GodotArray<String>");
+		TYPE_MAP.put("typedarray::Vector2", "GodotArray<Vector2>");
+		TYPE_MAP.put("typedarray::Vector3", "GodotArray<Vector3>");
+
 		// Special types
 		TYPE_MAP.put("Variant", "Object");
 		TYPE_MAP.put("Object", "Godot");
@@ -94,34 +99,39 @@ public class TypeMapper {
 		}
 
 		// Handle enum types BEFORE stripping namespace prefix
-		// "enum::Error" or "enum::AudioStreamInteractive.AutoAdvanceMode" -> "int"
+		// "enum::Error" or "enum::Tree.SelectMode" -> "int" (resolved in
+		// JavaClassGenerator)
 		if (godotType.startsWith("enum::")) {
 			return "int";
 		}
 
-		// Handle typed arrays: "typedarray::String" -> String[]
+		// Handle typed arrays: "typedarray::String" -> GodotArray<String>
 		if (godotType.startsWith("typedarray::")) {
 			String innerType = godotType.substring("typedarray::".length());
-			// Handle empty inner type (e.g., "typedarray::" with nothing after it)
 			if (innerType.isEmpty()) {
-				return "Object[]";
+				return "GodotArray";
 			}
 			String javaInner = toJavaType(innerType);
-			// javaInner may be empty or non-Java-identifier if innerType was something
-			// like "27/0:" (numeric class ID) where indexOf(':') lands on the trailing
-			// colon, leaving an invalid identifier — fall back to Object[]
-			if (javaInner.isEmpty() || !isValidJavaIdentifier(javaInner)) {
-				return "Object[]";
+			if (javaInner.isEmpty() || !isValidJavaIdentifier(stripGenericParams(javaInner))) {
+				return "GodotArray";
 			}
-			return javaInner + "[]";
+			return "GodotArray<" + boxType(javaInner) + ">";
 		}
 
 		// Handle namespaced Godot types: "24/17:RichTextEffect" -> "RichTextEffect"
 		// These prefixes appear in typed arrays and custom types in extension_api.json
 		if (godotType.contains(":")) {
-			// Handle typeddictionary: "typeddictionary::int;String" -> Object
+			// Handle typeddictionary: "typeddictionary::int;String" ->
+			// GodotDictionary<Long, String>
 			if (godotType.startsWith("typeddictionary::")) {
-				return "Object";
+				String inner = godotType.substring("typeddictionary::".length());
+				int semi = inner.indexOf(';');
+				if (semi > 0 && semi < inner.length() - 1) {
+					String keyJava = boxType(toJavaType(inner.substring(0, semi)));
+					String valJava = boxType(toJavaType(inner.substring(semi + 1)));
+					return "GodotDictionary<" + keyJava + ", " + valJava + ">";
+				}
+				return "GodotDictionary";
 			}
 			int colonIdx = godotType.indexOf(':');
 			String stripped = godotType.substring(colonIdx + 1);
@@ -214,5 +224,31 @@ public class TypeMapper {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Strip generic type parameters from a type name for validation:
+	 * "GodotArray<String>" -> "GodotArray".
+	 */
+	private static String stripGenericParams(String type) {
+		int lt = type.indexOf('<');
+		return lt > 0 ? type.substring(0, lt) : type;
+	}
+
+	/**
+	 * Box a Java primitive type for use as a generic type argument: "long" ->
+	 * "Long".
+	 */
+	static String boxType(String javaType) {
+		return switch (javaType) {
+			case "boolean" -> "Boolean";
+			case "byte" -> "Byte";
+			case "short" -> "Short";
+			case "int" -> "Integer";
+			case "long" -> "Long";
+			case "float" -> "Float";
+			case "double" -> "Double";
+			default -> javaType;
+		};
 	}
 }

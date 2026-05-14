@@ -181,6 +181,7 @@ public final class CallableDispatch {
 			setError(errorSeg, 0);
 
 		} catch (Throwable t) {
+			logger.error("CallableDispatch error", t);
 			try {
 				writeNilVariant(retSeg);
 				setError(errorSeg, 2);

@@ -58,6 +58,48 @@ public final class PropertyRegistration {
 		return Dispatch.getExports(className).length;
 	}
 
+	/**
+	 * Register @ExportGroup and @ExportSubgroup for a class via ClassDB.
+	 *
+	 * <p>
+	 * Uses classdb_register_extension_class_property_group (API index 165) and
+	 * classdb_register_extension_class_property_subgroup (API index 166).
+	 */
+	public static void registerGroups(String className) {
+		PropertyMeta[] exports = Dispatch.getExports(className);
+		if (exports == null || exports.length == 0) {
+			return;
+		}
+
+		GodotStringName classSn = GodotStringName.fromJavaString(className);
+		String lastGroup = "";
+		String lastSubgroup = "";
+
+		for (PropertyMeta meta : exports) {
+			String group = meta.group();
+			String subgroup = meta.subgroup();
+
+			if (!group.isEmpty() && !group.equals(lastGroup)) {
+				GodotStringName groupSn = GodotStringName.fromJavaString(group);
+				GodotString groupHintStr = GodotString.fromJavaString(meta.groupHint());
+				Bridge.callVoid(ApiIndex.CLASSDB_REGISTER_EXTENSION_CLASS_PROPERTY_GROUP,
+						MemorySegment.ofAddress(Bridge.libraryPtr()), classSn.segment(), groupSn.segment(),
+						groupHintStr.segment());
+				lastGroup = group;
+				lastSubgroup = "";
+			}
+
+			if (!subgroup.isEmpty() && !subgroup.equals(lastSubgroup)) {
+				GodotStringName subgroupSn = GodotStringName.fromJavaString(subgroup);
+				GodotString subgroupHintStr = GodotString.fromJavaString(meta.subgroupHint());
+				Bridge.callVoid(ApiIndex.CLASSDB_REGISTER_EXTENSION_CLASS_PROPERTY_SUBGROUP,
+						MemorySegment.ofAddress(Bridge.libraryPtr()), classSn.segment(), subgroupSn.segment(),
+						subgroupHintStr.segment());
+				lastSubgroup = subgroup;
+			}
+		}
+	}
+
 	private static void registerProperty(String godotClassName, PropertyMeta meta) {
 		// Build PropertyInfo struct
 		MemorySegment propertyInfo = buildPropertyInfo(meta);

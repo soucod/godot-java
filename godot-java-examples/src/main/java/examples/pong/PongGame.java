@@ -78,13 +78,13 @@ public class PongGame extends Node2D {
 		double offsetY = (648 - HEIGHT) / 2;
 		container = Node2D.create();
 		container.setPosition(new Vector2(offsetX, offsetY));
-		addChild(container, false, 0);
+		addChild(container);
 
 		// Play area background
 		ColorRect bg = ColorRect.create();
 		bg.setColor(new org.godot.math.Color(0.05, 0.05, 0.1));
 		bg.setSize(new Vector2(WIDTH, HEIGHT));
-		container.addChild(bg, false, 0);
+		container.addChild(bg);
 
 		// Center dashed line
 		for (int i = 0; i < HEIGHT; i += 20) {
@@ -92,26 +92,26 @@ public class PongGame extends Node2D {
 			dash.setColor(new org.godot.math.Color(0.3, 0.3, 0.3));
 			dash.setSize(new Vector2(2, 10));
 			dash.setPosition(new Vector2(WIDTH / 2 - 1, i));
-			container.addChild(dash, false, 0);
+			container.addChild(dash);
 		}
 
 		// Ball
 		ball = ColorRect.create();
 		ball.setColor(new org.godot.math.Color(1, 1, 1));
 		ball.setSize(new Vector2(BALL_SIZE, BALL_SIZE));
-		container.addChild(ball, false, 0);
+		container.addChild(ball);
 
 		// Player paddle (left)
 		playerPaddle = ColorRect.create();
 		playerPaddle.setColor(new org.godot.math.Color(0.3, 0.7, 1.0));
 		playerPaddle.setSize(new Vector2(PADDLE_W, PADDLE_H));
-		container.addChild(playerPaddle, false, 0);
+		container.addChild(playerPaddle);
 
 		// AI paddle (right)
 		aiPaddle = ColorRect.create();
 		aiPaddle.setColor(new org.godot.math.Color(1.0, 0.4, 0.4));
 		aiPaddle.setSize(new Vector2(PADDLE_W, PADDLE_H));
-		container.addChild(aiPaddle, false, 0);
+		container.addChild(aiPaddle);
 
 		// Player score label
 		playerLabel = Label.create();
@@ -119,7 +119,7 @@ public class PongGame extends Node2D {
 		playerLabel.addThemeFontSizeOverride("font_size", 48);
 		playerLabel.setPosition(new Vector2(WIDTH / 4 - 30, 20));
 		playerLabel.setSize(new Vector2(60, 60));
-		container.addChild(playerLabel, false, 0);
+		container.addChild(playerLabel);
 
 		// AI score label
 		aiLabel = Label.create();
@@ -127,7 +127,7 @@ public class PongGame extends Node2D {
 		aiLabel.addThemeFontSizeOverride("font_size", 48);
 		aiLabel.setPosition(new Vector2(3 * WIDTH / 4 - 30, 20));
 		aiLabel.setSize(new Vector2(60, 60));
-		container.addChild(aiLabel, false, 0);
+		container.addChild(aiLabel);
 
 		// Message label
 		messageLabel = Label.create();
@@ -136,7 +136,7 @@ public class PongGame extends Node2D {
 		messageLabel.setPosition(new Vector2(WIDTH / 2 - 150, HEIGHT / 2 - 20));
 		messageLabel.setSize(new Vector2(300, 40));
 		messageLabel.setVisible(false);
-		container.addChild(messageLabel, false, 0);
+		container.addChild(messageLabel);
 
 		resetGame();
 		updateScoreDisplay();
@@ -228,7 +228,7 @@ public class PongGame extends Node2D {
 	}
 
 	private void onScoreUpdate() {
-		emitSignal("onScore", playerScore, aiScore);
+		new PongGameSignals(this).onScore().emit(playerScore, aiScore);
 		updateScoreDisplay();
 		if (!running) {
 			if (playerScore >= WIN_SCORE) {

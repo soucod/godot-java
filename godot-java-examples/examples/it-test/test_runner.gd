@@ -37,6 +37,10 @@ func run_tests():
 	test_signal()
 	test_process_virtual()
 	test_control_minimum_size()
+	test_enum_round_trip()
+	test_enum_default_value_overload()
+	test_virtual_method_override()
+	test_variant_round_trip()
 	test_notification()
 	test_lifecycle_order()
 	test_dispatch_matrix()
@@ -45,6 +49,9 @@ func run_tests():
 	test_typed_collection_returns()
 	test_generated_registry()
 	test_scoped_memory_diagnostics()
+	test_callback_exception()
+	test_missing_method_call()
+	test_diagnostic_context()
 	test_short_stress()
 	await test_java_object_mapping_cleanup()
 	print("TEST_DIAGNOSTIC: %s" % test_node.captureMemoryStats("teardown"))
@@ -134,6 +141,22 @@ func test_control_minimum_size():
 	var result: bool = test_node.test_control_minimum_size()
 	assert_true(result, "Control minimum size methods working")
 
+func test_enum_round_trip():
+	var result: bool = test_node.testEnumRoundTrip()
+	assert_true(result, "Enum arg/return round-trip via typed ptrcall")
+
+func test_enum_default_value_overload():
+	var result: bool = test_node.testEnumDefaultValueInOverload()
+	assert_true(result, "Enum default-value overload (addChild) works")
+
+func test_virtual_method_override():
+	var result: bool = test_node.testVirtualMethodOverride()
+	assert_true(result, "Virtual method override exists and is callable")
+
+func test_variant_round_trip():
+	var result: bool = test_node.testVariantRoundTrip()
+	assert_true(result, "Variant round-trip covers String, Vector2, Object, Array, Dictionary, RefCounted")
+
 func test_notification():
 	# NOTIFICATION_READY = 13 should have been delivered when the node entered the tree
 	var notif_count: int = test_node.getNotificationCount()
@@ -202,3 +225,17 @@ func test_java_object_mapping_cleanup():
 	await get_tree().process_frame
 	var after: int = test_node.getJavaObjectMapSize()
 	assert_true(after < before, "JavaObjectMap shrinks after Java-backed node queue_free (before=%d after=%d)" % [before, after])
+
+func test_callback_exception():
+	# Verify Java-side exception handling and resilience
+	var result: bool = test_node.testCallbackExceptionResilience()
+	assert_true(result, "Java callback exception is caught and node remains functional")
+
+func test_missing_method_call():
+	# Verify missing method dispatch is handled gracefully
+	var result: bool = test_node.testMissingMethodHandling()
+	assert_true(result, "missing method dispatch returns gracefully without crash")
+
+func test_diagnostic_context():
+	var result: bool = test_node.testDiagnosticContextAvailable()
+	assert_true(result, "Dispatch registry has class/method/property context for IntegrationTestNode")

@@ -319,6 +319,12 @@ public class GodotIntegrationTest {
 				"Node churn should pass. Output:\n" + String.join("\n", outputLines));
 		assertTrue(hasMarker("PASS: RefCounted helper reference/unreference lifecycle"),
 				"RefCounted lifecycle should pass. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: typed Array return stays valid after ptrcall"),
+				"Typed Array return should pass. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: typed Dictionary return stays valid after ptrcall"),
+				"Typed Dictionary return should pass. Output:\n" + String.join("\n", outputLines));
+		assertTrue(hasMarker("PASS: typed StringName array return copies to Java array"),
+				"Typed StringName array return should pass. Output:\n" + String.join("\n", outputLines));
 		assertTrue(hasMarker("PASS: generated class registry is present"),
 				"Generated registry should be present. Output:\n" + String.join("\n", outputLines));
 		assertTrue(hasMarker("PASS: stability stress run completed"),

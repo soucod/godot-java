@@ -364,6 +364,26 @@ public abstract class Godot {
 				ret -> VariantUtils.toObject(new Variant(ret)), typedArgs);
 	}
 
+	protected GodotArray callEngineArray(String className, String methodName, long hash, Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, VariantType.ARRAY.id(), Godot::readTypedArrayReturn,
+				typedArgs);
+	}
+
+	protected GodotDictionary callEngineDictionary(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return callEnginePtr(className, methodName, hash, 8, VariantType.DICTIONARY.id(),
+				Godot::readTypedDictionaryReturn, typedArgs);
+	}
+
+	protected String[] callEngineTypedStringArray(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return stringArrayFromGodotArray(callEngineArray(className, methodName, hash, typedArgs));
+	}
+
+	protected long[] callEngineTypedIntArray(String className, String methodName, long hash, Object... typedArgs) {
+		return longArrayFromGodotArray(callEngineArray(className, methodName, hash, typedArgs));
+	}
+
 	protected byte[] callEnginePackedByteArray(String className, String methodName, long hash, Object... typedArgs) {
 		return (byte[]) callEngineTypedBuiltinObject(className, methodName, hash, 16,
 				VariantType.PACKED_BYTE_ARRAY.id(), typedArgs);
@@ -575,6 +595,27 @@ public abstract class Godot {
 	protected static Object callStaticVariant(String className, String methodName, long hash, Object... typedArgs) {
 		return callStaticPtr(className, methodName, hash, Variant.SIZE, VARIANT_SENTINEL,
 				ret -> VariantUtils.toObject(new Variant(ret)), typedArgs);
+	}
+
+	protected static GodotArray callStaticArray(String className, String methodName, long hash, Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, VariantType.ARRAY.id(), Godot::readTypedArrayReturn,
+				typedArgs);
+	}
+
+	protected static GodotDictionary callStaticDictionary(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return callStaticPtr(className, methodName, hash, 8, VariantType.DICTIONARY.id(),
+				Godot::readTypedDictionaryReturn, typedArgs);
+	}
+
+	protected static String[] callStaticTypedStringArray(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return stringArrayFromGodotArray(callStaticArray(className, methodName, hash, typedArgs));
+	}
+
+	protected static long[] callStaticTypedIntArray(String className, String methodName, long hash,
+			Object... typedArgs) {
+		return longArrayFromGodotArray(callStaticArray(className, methodName, hash, typedArgs));
 	}
 
 	protected static byte[] callStaticPackedByteArray(String className, String methodName, long hash,
@@ -1141,6 +1182,62 @@ public abstract class Godot {
 		} catch (Throwable t) {
 			throw new RuntimeException("Failed to read typed builtin as Object", t);
 		}
+	}
+
+	private static GodotArray readTypedArrayReturn(MemorySegment value) {
+		return readOwnedBuiltinReturn(value, VariantType.ARRAY.id(), GodotArray::fromOwnedVariant);
+	}
+
+	private static GodotDictionary readTypedDictionaryReturn(MemorySegment value) {
+		return readOwnedBuiltinReturn(value, VariantType.DICTIONARY.id(), GodotDictionary::fromOwnedVariant);
+	}
+
+	private static <T> T readOwnedBuiltinReturn(MemorySegment value, int variantType, Function<MemorySegment, T> reader) {
+		try {
+			MemorySegment variant = Bridge.allocVariant();
+			MethodHandle ctor = Variant.getTypeConstructor(variantType);
+			if (ctor == null) {
+				throw new IllegalStateException("No Variant constructor for builtin type " + variantType);
+			}
+			ctor.invoke(variant, value);
+			try {
+				return reader.apply(variant);
+			} finally {
+				Bridge.destroyVariant(variant);
+			}
+		} catch (Throwable t) {
+			throw new RuntimeException("Failed to read owned typed builtin return type " + variantType, t);
+		}
+	}
+
+	private static String[] stringArrayFromGodotArray(GodotArray array) {
+		if (array == null || !array.isValid()) {
+			return new String[0];
+		}
+		int size = array.size();
+		String[] result = new String[size];
+		for (int i = 0; i < size; i++) {
+			Object value = array.get(i);
+			result[i] = value == null ? null : value.toString();
+		}
+		return result;
+	}
+
+	private static long[] longArrayFromGodotArray(GodotArray array) {
+		if (array == null || !array.isValid()) {
+			return new long[0];
+		}
+		int size = array.size();
+		long[] result = new long[size];
+		for (int i = 0; i < size; i++) {
+			Object value = array.get(i);
+			if (!(value instanceof Number number)) {
+				throw new IllegalStateException("typedarray::int element " + i + " was "
+						+ (value == null ? "null" : value.getClass().getName()));
+			}
+			result[i] = number.longValue();
+		}
+		return result;
 	}
 
 	private static double[] floatArrayToDoubleArray(float[] values) {

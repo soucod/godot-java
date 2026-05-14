@@ -42,6 +42,7 @@ func run_tests():
 	test_dispatch_matrix()
 	test_java_to_godot_calls()
 	test_ref_counted_lifecycle()
+	test_typed_collection_returns()
 	test_generated_registry()
 	test_scoped_memory_diagnostics()
 	test_short_stress()
@@ -170,6 +171,11 @@ func test_ref_counted_lifecycle():
 	var after: int = test_node.getTrackedRefCountedCount()
 	assert_true(result, "RefCounted helper reference/unreference lifecycle")
 	assert_eq(after, before, "RefCounted tracked count returns to baseline")
+
+func test_typed_collection_returns():
+	assert_true(test_node.testTypedArrayReturn(), "typed Array return stays valid after ptrcall")
+	assert_true(test_node.testTypedDictionaryReturn(), "typed Dictionary return stays valid after ptrcall")
+	assert_true(test_node.testTypedStringArrayReturn(), "typed StringName array return copies to Java array")
 
 func test_generated_registry():
 	assert_true(test_node.generatedRegistryAvailable(), "generated class registry is present")

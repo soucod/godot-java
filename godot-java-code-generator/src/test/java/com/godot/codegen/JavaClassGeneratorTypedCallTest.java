@@ -177,6 +177,34 @@ class JavaClassGeneratorTypedCallTest {
 	}
 
 	@Test
+	void arrayAndDictionaryReturnsUseOwnedTypedBuiltinHelpers() {
+		String arraySource = generateSource(
+				new MethodInfo("get_values", true, false, false, false, 30L, List.of(), "Array", null));
+		assertTrue(arraySource.contains("public GodotArray getValues()"), arraySource);
+		assertTrue(arraySource.contains("return callEngineArray(\"TestNode\", \"get_values\", 30L);"), arraySource);
+
+		String dictionarySource = generateSource(
+				new MethodInfo("get_options", true, false, false, false, 31L, List.of(), "Dictionary", null));
+		assertTrue(dictionarySource.contains("public GodotDictionary getOptions()"), dictionarySource);
+		assertTrue(dictionarySource.contains("return callEngineDictionary(\"TestNode\", \"get_options\", 31L);"),
+				dictionarySource);
+	}
+
+	@Test
+	void selectedTypedArrayReturnsUseCopyingHelpers() {
+		String namesSource = generateSource(
+				new MethodInfo("get_groups", true, false, false, false, 32L, List.of(), "typedarray::StringName", null));
+		assertTrue(namesSource.contains("public String[] getGroups()"), namesSource);
+		assertTrue(namesSource.contains("return callEngineTypedStringArray(\"TestNode\", \"get_groups\", 32L);"),
+				namesSource);
+
+		String intSource = generateSource(
+				new MethodInfo("get_ids", true, false, false, false, 33L, List.of(), "typedarray::int", null));
+		assertTrue(intSource.contains("public long[] getIds()"), intSource);
+		assertTrue(intSource.contains("return callEngineTypedIntArray(\"TestNode\", \"get_ids\", 33L);"), intSource);
+	}
+
+	@Test
 	void engineObjectReturnAndArgUseTypedPtrcallHelper() {
 		ClassInfo texture = new ClassInfo("Texture2D", "Resource", true, false, "core", List.of(), List.of(), List.of(),
 				List.of());

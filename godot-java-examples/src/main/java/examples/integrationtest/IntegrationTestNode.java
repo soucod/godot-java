@@ -5,6 +5,8 @@ import org.godot.annotation.GodotClass;
 import org.godot.annotation.GodotMethod;
 import org.godot.annotation.Signal;
 import org.godot.bridge.Bridge;
+import org.godot.collection.GodotArray;
+import org.godot.collection.GodotDictionary;
 import org.godot.internal.NativeMemoryTracker;
 import org.godot.internal.ref.JavaObjectMap;
 import org.godot.internal.ref.RefCountedHelper;
@@ -261,6 +263,56 @@ public class IntegrationTestNode extends Node {
 		value.unreference();
 		value.setNativeObject(0);
 		return RefCountedHelper.trackedReferenceCount() == trackedBefore;
+	}
+
+	@GodotMethod
+	public boolean testTypedArrayReturn() {
+		GodotArray values = getNodeAndResource(".");
+		if (values == null || !values.isValid()) {
+			System.out.println("FAIL: getNodeAndResource returned invalid Array");
+			return false;
+		}
+		int size = values.size();
+		if (size < 1) {
+			System.out.println("FAIL: getNodeAndResource returned empty Array");
+			return false;
+		}
+		Object first = values.get(0);
+		boolean ok = first instanceof Node;
+		if (!ok) {
+			System.out.println("FAIL: getNodeAndResource first element was not Node: "
+					+ (first == null ? "null" : first.getClass().getName()));
+		}
+		return ok;
+	}
+
+	@GodotMethod
+	public boolean testTypedDictionaryReturn() {
+		GodotDictionary version = org.godot.singleton.Engine.singleton().getVersionInfo();
+		if (version == null || !version.isValid()) {
+			System.out.println("FAIL: Engine.getVersionInfo returned invalid Dictionary");
+			return false;
+		}
+		Object major = version.get("major");
+		boolean ok = major instanceof Number && ((Number) major).intValue() >= 4;
+		if (!ok) {
+			System.out.println("FAIL: Engine.getVersionInfo major was invalid: " + major);
+		}
+		return ok;
+	}
+
+	@GodotMethod
+	public boolean testTypedStringArrayReturn() {
+		String groupName = "typed-array-return";
+		addToGroup(groupName);
+		String[] groups = getGroups();
+		for (String group : groups) {
+			if (groupName.equals(group)) {
+				return true;
+			}
+		}
+		System.out.println("FAIL: getGroups did not include " + groupName);
+		return false;
 	}
 
 	@GodotMethod

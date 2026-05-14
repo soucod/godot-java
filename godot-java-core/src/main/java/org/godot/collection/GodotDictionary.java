@@ -1,6 +1,7 @@
 package org.godot.collection;
 
 import org.godot.node.RefCounted;
+import org.godot.core.OwnedVariant;
 import org.godot.core.Variant;
 import org.godot.core.VariantUtils;
 import org.godot.bridge.Bridge;
@@ -18,11 +19,14 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
  */
 public class GodotDictionary extends RefCounted {
 
+	private final OwnedVariant ownedVariant;
+
 	/**
 	 * Create a wrapper for an existing native Dictionary.
 	 */
 	public GodotDictionary(long nativePtr) {
 		super(nativePtr);
+		this.ownedVariant = null;
 	}
 
 	/**
@@ -30,6 +34,17 @@ public class GodotDictionary extends RefCounted {
 	 */
 	public GodotDictionary() {
 		super(0);
+		this.ownedVariant = null;
+	}
+
+	private GodotDictionary(OwnedVariant ownedVariant) {
+		super(ownedVariant.segment().get(ADDRESS, 8).address());
+		this.ownedVariant = ownedVariant;
+	}
+
+	public static GodotDictionary fromOwnedVariant(MemorySegment variantSeg) {
+		OwnedVariant owned = OwnedVariant.copyOf(variantSeg);
+		return new GodotDictionary(owned);
 	}
 
 	/**
@@ -56,12 +71,12 @@ public class GodotDictionary extends RefCounted {
 			Variant keyVar = VariantUtils.fromObject(key);
 			MemorySegment keyVarSegment = keyVar.getSegment();
 			try {
-				MemorySegment retVar = Bridge.allocVariant();
-
-				Bridge.callVoid(ApiIndex.DICTIONARY_OPERATOR_INDEX_CONST, dictPtrBuf, keyVarSegment, retVar);
-				Object result = VariantUtils.toObject(new Variant(retVar));
-				Bridge.destroyVariant(retVar);
-				return result;
+				MemorySegment value = Bridge.callPtr(ApiIndex.DICTIONARY_OPERATOR_INDEX_CONST, dictPtrBuf,
+						keyVarSegment);
+				if (value.address() == 0) {
+					return null;
+				}
+				return VariantUtils.toObject(new Variant(value.reinterpret(Variant.SIZE)));
 			} finally {
 				Bridge.destroyVariant(keyVarSegment);
 			}

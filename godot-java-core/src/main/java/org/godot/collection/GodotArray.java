@@ -1,6 +1,7 @@
 package org.godot.collection;
 
 import org.godot.node.RefCounted;
+import org.godot.core.OwnedVariant;
 import org.godot.core.Variant;
 import org.godot.core.VariantUtils;
 import org.godot.bridge.Bridge;
@@ -19,12 +20,16 @@ import static java.lang.foreign.ValueLayout.JAVA_INT;
  */
 public class GodotArray extends RefCounted {
 
+	private final OwnedVariant ownedVariant;
+
 	public GodotArray() {
 		super(0);
+		this.ownedVariant = null;
 	}
 
 	public GodotArray(long nativePtr) {
 		super(nativePtr);
+		this.ownedVariant = null;
 	}
 
 	/**
@@ -33,12 +38,23 @@ public class GodotArray extends RefCounted {
 	 */
 	public GodotArray(MemorySegment variantSeg) {
 		super(variantSeg.get(ADDRESS, 8));
+		this.ownedVariant = null;
+	}
+
+	private GodotArray(OwnedVariant ownedVariant) {
+		super(ownedVariant.segment().get(ADDRESS, 8));
+		this.ownedVariant = ownedVariant;
 	}
 
 	public static GodotArray fromNative(long nativePtr) {
 		if (nativePtr == 0)
 			return null;
 		return new GodotArray(nativePtr);
+	}
+
+	public static GodotArray fromOwnedVariant(MemorySegment variantSeg) {
+		OwnedVariant owned = OwnedVariant.copyOf(variantSeg);
+		return new GodotArray(owned);
 	}
 
 	/**

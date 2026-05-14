@@ -31,10 +31,20 @@ class TypedAbiModelTest {
 	@Test
 	void collectionDescriptorsSeparateArgumentAndReturnSupport() {
 		TypedAbiModel.Descriptor array = TypedAbiModel.descriptor("Array", null);
-		assertFalse(array.supportsReturn());
+		assertTrue(array.supportsReturn());
+		assertEquals("Array", array.returnHelperSuffix());
 		assertTrue(array.supportsArgument());
 		assertEquals("typedArrayArg(values)", array.arg("values"));
+		assertTrue(array.returnCompatibleWithProperty("GodotArray"));
 		assertTrue(array.argumentCompatibleWithProperty("GodotArray"));
+
+		TypedAbiModel.Descriptor dictionary = TypedAbiModel.descriptor("Dictionary", null);
+		assertTrue(dictionary.supportsReturn());
+		assertEquals("Dictionary", dictionary.returnHelperSuffix());
+		assertTrue(dictionary.supportsArgument());
+		assertEquals("typedDictionaryArg(options)", dictionary.arg("options"));
+		assertTrue(dictionary.returnCompatibleWithProperty("GodotDictionary"));
+		assertTrue(dictionary.argumentCompatibleWithProperty("GodotDictionary"));
 
 		TypedAbiModel.Descriptor packed = TypedAbiModel.descriptor("PackedVector3Array", null);
 		assertTrue(packed.supportsReturn());
@@ -48,6 +58,25 @@ class TypedAbiModelTest {
 	void unsupportedTypedCollectionsRemainUnmodeled() {
 		assertNull(TypedAbiModel.descriptor("typedarray::RID", null));
 		assertNull(TypedAbiModel.descriptor("typeddictionary::String;int", null));
+		assertFalse(TypedAbiModel.descriptor("Callable", null).supportsReturn());
+		assertFalse(TypedAbiModel.descriptor("Signal", null).supportsReturn());
+	}
+
+	@Test
+	void selectedTypedArrayReturnsAreModeledWithoutArgumentSupport() {
+		TypedAbiModel.Descriptor names = TypedAbiModel.descriptor("typedarray::StringName", null);
+		assertTrue(names.supportsReturn());
+		assertFalse(names.supportsArgument());
+		assertEquals("TypedStringArray", names.returnHelperSuffix());
+		assertTrue(names.returnCompatibleWithProperty("String[]"));
+		assertFalse(names.argumentCompatibleWithProperty("String[]"));
+
+		TypedAbiModel.Descriptor ints = TypedAbiModel.descriptor("typedarray::int", null);
+		assertTrue(ints.supportsReturn());
+		assertFalse(ints.supportsArgument());
+		assertEquals("TypedIntArray", ints.returnHelperSuffix());
+		assertTrue(ints.returnCompatibleWithProperty("long[]"));
+		assertFalse(ints.argumentCompatibleWithProperty("long[]"));
 	}
 
 	@Test

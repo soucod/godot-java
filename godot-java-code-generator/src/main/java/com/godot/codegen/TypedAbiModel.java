@@ -17,9 +17,9 @@ final class TypedAbiModel {
 					new Descriptor("StringName", param -> "typedStringNameArg(" + param + ")", "String")),
 			entry("NodePath", new Descriptor("NodePath", param -> "typedNodePathArg(" + param + ")", "String")),
 			entry("Variant", new Descriptor("Variant", param -> "typedVariantArg(" + param + ")", null)),
-			entry("Array", new Descriptor(null, param -> "typedArrayArg(" + param + ")", "GodotArray")),
+			entry("Array", new Descriptor("Array", param -> "typedArrayArg(" + param + ")", "GodotArray")),
 			entry("Dictionary",
-					new Descriptor(null, param -> "typedDictionaryArg(" + param + ")", "GodotDictionary")),
+					new Descriptor("Dictionary", param -> "typedDictionaryArg(" + param + ")", "GodotDictionary")),
 			entry("Callable", new Descriptor(null, param -> "typedCallableArg(" + param + ")", "Callable")),
 			entry("Signal", new Descriptor(null, param -> "typedSignalArg(" + param + ")", "Signal")),
 			entry("PackedByteArray",
@@ -58,6 +58,9 @@ final class TypedAbiModel {
 		if (type.startsWith("enum::") || type.startsWith("bitfield::")) {
 			return new Descriptor("Int32", param -> "java.lang.Integer.valueOf(" + param + ")", "int", null);
 		}
+		if (type.startsWith("typedarray::")) {
+			return typedArrayDescriptor(type.substring("typedarray::".length()));
+		}
 		if ("int".equals(type)) {
 			return integerDescriptor(meta);
 		}
@@ -94,6 +97,16 @@ final class TypedAbiModel {
 		}
 		if (meta == null || meta.isEmpty() || "int64".equals(meta)) {
 			return new Descriptor("Int64", param -> "java.lang.Long.valueOf(" + param + ")", "long");
+		}
+		return null;
+	}
+
+	private static Descriptor typedArrayDescriptor(String elementType) {
+		if ("String".equals(elementType) || "StringName".equals(elementType) || "NodePath".equals(elementType)) {
+			return new Descriptor("TypedStringArray", null, "String[]", null);
+		}
+		if ("int".equals(elementType)) {
+			return new Descriptor("TypedIntArray", null, "long[]", null);
 		}
 		return null;
 	}

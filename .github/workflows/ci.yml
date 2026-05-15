@@ -139,7 +139,7 @@ jobs:
           dir godot-java-core\native\build\ 2>nul || echo not found
 
       - name: Build
-        run: ./mvnw clean package -DskipTests -B
+        run: ./mvnw clean package -DskipTests -B -Dgodot.java.native.skip.unpack=true
 
       - name: Create extension_list.cfg for CI
         shell: bash
@@ -158,6 +158,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: .\mvnw.cmd package -pl godot-java-native -Ppackage-native,${{ matrix.native_profile }} -Dspotless.skip=true -B
+
+      - name: Create extension_list.cfg for CI
+        shell: bash
+        run: |
+          mkdir -p godot-java-examples/examples/it-test/.godot
+          printf 'res://godot-java.gdextension\n' > godot-java-examples/examples/it-test/.godot/extension_list.cfg
+          echo "extension_list.cfg contents:"
+          cat godot-java-examples/examples/it-test/.godot/extension_list.cfg
+          echo "--- end ---"
 
       - name: Sync godot-java runtime to it-test (bash)
         if: runner.os != 'Windows'

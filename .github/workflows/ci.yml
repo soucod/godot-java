@@ -139,7 +139,7 @@ jobs:
           dir godot-java-core\native\build\ 2>nul || echo not found
 
       - name: Build
-        run: ./mvnw clean package -DskipTests -B -Dgodot.java.native.skip.unpack=true
+        run: ./mvnw clean package -DskipTests -B -Pskip-native-unpack
 
       - name: Create extension_list.cfg for CI
         shell: bash

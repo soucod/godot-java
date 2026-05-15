@@ -177,5 +177,11 @@
                 <godot.java.native.library>libgodot-java.dll</godot.java.native.library>
             </properties>
         </profile>
+        <profile>
+            <id>skip-native-unpack</id>
+            <properties>
+                <godot.java.native.skip.unpack>true</godot.java.native.skip.unpack>
+            </properties>
+        </profile>
     </profiles>
 </project>

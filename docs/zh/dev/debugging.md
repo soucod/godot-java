@@ -214,15 +214,15 @@ echo $JAVA_HOME
 
 ```bash
 # 检查库依赖
-otool -L native/libgodot-java.dylib    # macOS
-ldd native/libgodot-java.so             # Linux
+otool -L godot-java/libgodot-java.dylib    # macOS
+ldd godot-java/libgodot-java.so             # Linux
 
 # 检查导出符号
-nm -gU native/libgodot-java.dylib       # macOS
-nm -D native/libgodot-java.so           # Linux
+nm -gU godot-java/libgodot-java.dylib       # macOS
+nm -D godot-java/libgodot-java.so           # Linux
 
 # 确认入口函数存在
-nm -gU native/libgodot-java.dylib | grep godot_java_init
+nm -gU godot-java/libgodot-java.dylib | grep godot_java_init
 ```
 
 ### 在 C++ 中添加调试输出

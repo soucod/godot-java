@@ -138,7 +138,7 @@ Verify the dependency in `pom.xml`:
 <dependency>
     <groupId>io.github.youngledo</groupId>
     <artifactId>godot-java-core</artifactId>
-    <version>0.1.3</version>
+    <version>LATEST_VERSION</version>
 </dependency>
 ```
 

@@ -48,7 +48,7 @@ The Maven property `godot-java.version` controls both Java and native artifacts.
 
 ```xml
 <properties>
-    <godot-java.version>0.1.3</godot-java.version>
+    <godot-java.version>LATEST_VERSION</godot-java.version> <!-- check Maven Central for latest -->
     <maven.compiler.release>25</maven.compiler.release>
 </properties>
 ```
@@ -184,7 +184,7 @@ Add the Java dependency:
     <dependency>
         <groupId>io.github.youngledo</groupId>
         <artifactId>godot-java-core</artifactId>
-        <version>0.1.3</version>
+        <version>LATEST_VERSION</version>
     </dependency>
 </dependencies>
 ```
@@ -223,7 +223,7 @@ windows.release = "res://godot-java/libgodot-java.dll"
 The native library is distributed as:
 
 ```text
-io.github.youngledo:godot-java-native:0.1.3:zip:<classifier>
+io.github.youngledo:godot-java-native:LATEST_VERSION:zip:<classifier>
 ```
 
 The native artifact version must match the `godot-java-core` version inside `app.jar`.

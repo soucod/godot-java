@@ -59,7 +59,7 @@ The project has a parent POM with two child modules:
 
 ```
 godot-java (parent POM)
-  |-- pom.xml    groupId: io.github.youngledo, artifactId: godot-java, version: 0.1.0
+  |-- pom.xml    groupId: io.github.youngledo, artifactId: godot-java, version: LATEST_VERSION
   |
   |-- godot-java-core/
   |     pom.xml  artifactId: godot-java-core
@@ -83,7 +83,7 @@ godot-java (parent POM)
 ```xml
 <groupId>io.github.youngledo</groupId>
 <artifactId>godot-java</artifactId>
-<version>0.1.0</version>
+<version>LATEST_VERSION</version>
 <packaging>pom</packaging>
 
 <properties>
@@ -285,7 +285,7 @@ Copy the compiled native library to your Godot test project:
 ```bash
 mkdir -p /path/to/test-project/native
 cp godot-java-core/native/build/libgodot-java.dylib \
-   /path/to/test-project/native/
+   /path/to/test-project/godot-java/
 ```
 
 ### Step 3: Configure Classpath
@@ -358,7 +358,7 @@ mvn clean install -U -Dcheckstyle.skip=true
 
 1. Verify `.gdextension` paths.
 2. Check library architecture matches Godot.
-3. Ensure execute permission: `chmod +x native/libgodot-java.*`
+3. Ensure execute permission: `chmod +x godot-java/libgodot-java.*`
 
 
 ## Cross-Platform Build Details
@@ -373,12 +373,12 @@ entry_symbol = "godot_java_init"
 compatibility_minimum = "4.6"
 
 [libraries]
-macos.debug = "res://native/libgodot-java.dylib"
-macos.release = "res://native/libgodot-java.dylib"
-linux.debug = "res://native/libgodot-java.so"
-linux.release = "res://native/libgodot-java.so"
-windows.debug = "res://native/libgodot-java.dll"
-windows.release = "res://native/libgodot-java.dll"
+macos.debug = "res://godot-java/libgodot-java.dylib"
+macos.release = "res://godot-java/libgodot-java.dylib"
+linux.debug = "res://godot-java/libgodot-java.so"
+linux.release = "res://godot-java/libgodot-java.so"
+windows.debug = "res://godot-java/libgodot-java.dll"
+windows.release = "res://godot-java/libgodot-java.dll"
 ```
 
 ### Linux Build Requirements

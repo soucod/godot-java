@@ -283,7 +283,7 @@ emit("item_collected", "coin", 100);
 
 在 GDScript 中：
 ```gdscript
-player.connect("health_changed", self, "_on_health_changed")
+player.health_changed.connect(_on_health_changed)
 ```
 
 在 Java 中：

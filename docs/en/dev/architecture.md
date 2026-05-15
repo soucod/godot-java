@@ -280,9 +280,9 @@ The `GDExtensionClassCreationInfo4` struct wires these callbacks:
 
 ```
 godot-java/
-  pom.xml                           # Parent POM (org.godot:godot-java:0.1.0)
+  pom.xml                           # Parent POM (org.godot:godot-java:LATEST_VERSION)
   godot-java-core/                  # Core binding module
-    pom.xml                         # (org.godot:godot-java-core:0.1.0)
+    pom.xml                         # (org.godot:godot-java-core:LATEST_VERSION)
     src/main/java/
       module-info.java              # Module: org.godot
       org/godot/

@@ -105,21 +105,21 @@ mvn clean install -DskipTests -Dcheckstyle.skip=true
 ## Maven 项目结构
 
 ```
-godot-java/                     # 父 POM (org.godot:godot-java:0.1.0)
+godot-java/                     # 父 POM (org.godot:godot-java:LATEST_VERSION)
 ├── pom.xml                     # 父 POM，定义全局属性和依赖管理
 ├── godot-java-core/
-│   └── pom.xml                 # org.godot:godot-java-core:0.1.0
+│   └── pom.xml                 # org.godot:godot-java-core:LATEST_VERSION
 │                                # 主模块：Java 绑定代码
 │                                # 编译目标：Java 25
 │                                # 依赖：log4j-api, log4j-core, junit-jupiter
 ├── godot-java-code-generator/
-│   └── pom.xml                 # org.godot:godot-java-code-generator:0.1.0
+│   └── pom.xml                 # org.godot:godot-java-code-generator:LATEST_VERSION
 │                                # 代码生成器：从 extension_api.json 生成包装类
 ├── godot-java-processor/
-│   └── pom.xml                 # org.godot:godot-java-processor:0.1.0
+│   └── pom.xml                 # org.godot:godot-java-processor:LATEST_VERSION
 │                                # APT 处理器：编译期生成 TypedDispatch/VirtualDispatch
 ├── godot-java-examples/
-│   └── pom.xml                 # org.godot:godot-java-examples:0.1.0
+│   └── pom.xml                 # org.godot:godot-java-examples:LATEST_VERSION
 │                                # 示例项目（10 个示例，含集成测试）
 └── godot-api/                  # Godot API JSON 数据 (extension_api.json)
 ```
@@ -129,7 +129,7 @@ godot-java/                     # 父 POM (org.godot:godot-java:0.1.0)
 ```xml
 <groupId>io.github.youngledo</groupId>
 <artifactId>godot-java</artifactId>
-<version>0.1.0</version>
+<version>LATEST_VERSION</version>
 <packaging>pom</packaging>
 
 <properties>
@@ -247,7 +247,7 @@ mvn compile -Dcheckstyle.skip=true -q
 ```bash
 mkdir -p /path/to/test-project/native
 cp godot-java-core/native/build/libgodot-java.dylib \
-   /path/to/test-project/native/
+   /path/to/test-project/godot-java/
 ```
 
 ### 步骤 3：配置 Classpath
@@ -271,8 +271,8 @@ entry_symbol = "godot_java_init"
 compatibility_minimum = 4.6
 
 [libraries]
-macos.debug = "res://native/libgodot-java.dylib"
-macos.release = "res://native/libgodot-java.dylib"
+macos.debug = "res://godot-java/libgodot-java.dylib"
+macos.release = "res://godot-java/libgodot-java.dylib"
 ```
 
 ### 步骤 5：启动验证
@@ -368,12 +368,12 @@ entry_symbol = "godot_java_init"
 compatibility_minimum = "4.6"
 
 [libraries]
-macos.debug = "res://native/libgodot-java.dylib"
-macos.release = "res://native/libgodot-java.dylib"
-linux.debug = "res://native/libgodot-java.so"
-linux.release = "res://native/libgodot-java.so"
-windows.debug = "res://native/libgodot-java.dll"
-windows.release = "res://native/libgodot-java.dll"
+macos.debug = "res://godot-java/libgodot-java.dylib"
+macos.release = "res://godot-java/libgodot-java.dylib"
+linux.debug = "res://godot-java/libgodot-java.so"
+linux.release = "res://godot-java/libgodot-java.so"
+windows.debug = "res://godot-java/libgodot-java.dll"
+windows.release = "res://godot-java/libgodot-java.dll"
 ```
 
 ### Linux 构建要求

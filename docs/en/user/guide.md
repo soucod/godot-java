@@ -95,8 +95,8 @@ extends Node2D
 func _ready():
     var player = Player.new()
     add_child(player)
-    player.connect("health_changed", self, "_on_health_changed")
-    player.connect("died", self, "_on_died")
+    player.health_changed.connect(_on_health_changed)
+    player.died.connect(_on_died)
     player.take_damage(30)
 
 func _on_health_changed(new_health):
@@ -298,7 +298,7 @@ public void _ready() {
 From GDScript:
 
 ```gdscript
-player.connect("health_changed", self, "_on_health_changed")
+player.health_changed.connect(_on_health_changed)
 ```
 
 ## Type Coercion

@@ -9,7 +9,7 @@ ENGLISH | [中文](README_ZH.md)
 Java bindings for [Godot](https://godotengine.org/).  
 Built on top of GDExtension and Panama FFI to make Java a first-class citizen in the Godot ecosystem.
 
-> Status: 0.1.3 – production-ready with scoped memory management, full GDExtension feature coverage, and Maven Central desktop runtime artifacts.
+> Status: production-ready with scoped memory management, full GDExtension feature coverage, and Maven Central desktop runtime artifacts.
 
 ## Start a New Project
 
@@ -122,7 +122,8 @@ Core capabilities currently implemented:
   - `@GodotClass` – declare a Java class that can be instantiated from Godot
   - `@GodotMethod` – expose a Java method to be called from Godot
   - `@Export` – export a field to the Godot Inspector with `hint`/`hintString` support
-  - `@Signal` – declare and emit Godot signals from Java
+  - `@ExportGroup` / `@ExportSubgroup` – organize exported properties in the Inspector
+  - `@Signal` – declare and emit Godot signals from Java with type-safe `TypedSignal0-5`
   - APT processor (`godot-java-processor`) generates typed dispatch code at compile time (zero runtime reflection in the hot path)
 
 - **APT-compiled typed dispatch (aligned with gdext/Rust architecture)**
@@ -149,6 +150,9 @@ Core capabilities currently implemented:
 - **Type system and Variant interop**
   - Java-side types for `Variant`, `GodotStringName`, `GodotString`, `GodotArray`, `GodotDictionary`, etc.
   - Safe conversions between common Java types and Godot Variants
+  - **Enum/Bitfield types** — method parameters and returns use Java enums instead of raw `int`/`long` (e.g. `DisplayServer.WindowMode`, `WebSocketPeer.State`)
+  - **Typed signals** — `TypedSignal0` through `TypedSignal5` for compile-time arity-checked signal emission
+  - **`Godot.instantiate()`** — type-safe scene instantiation API
 
 ---
 
@@ -188,9 +192,10 @@ The annotation processor (`godot-java-processor`) generates per-class dispatch c
 ### 5. Property System
 
 - `@Export` annotation with `hint` and `hintString` for Godot editor integration
+- `@ExportGroup` / `@ExportSubgroup` — organize properties into named groups in the Inspector
 - `get_property_list_func` — exposes `@Export` fields to the Godot Inspector
 - `property_can_revert_func` / `property_get_revert_func` — default value support for revert behavior
-- `@Signal` annotation for signal declaration and emission from Java
+- `@Signal` annotation with `TypedSignal` for type-safe signal declaration and emission
 
 ---
 

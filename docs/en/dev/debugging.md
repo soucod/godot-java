@@ -250,14 +250,14 @@ ls $JAVA_HOME/lib/server/libjvm.so
 
 ```bash
 # Library dependencies
-otool -L native/libgodot-java.dylib    # macOS
-ldd native/libgodot-java.so             # Linux
+otool -L godot-java/libgodot-java.dylib    # macOS
+ldd godot-java/libgodot-java.so             # Linux
 
 # Undefined symbols
-nm -u native/libgodot-java.dylib
+nm -u godot-java/libgodot-java.dylib
 
 # Architecture
-file native/libgodot-java.dylib
+file godot-java/libgodot-java.dylib
 ```
 
 ## Debugging Tips

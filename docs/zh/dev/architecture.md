@@ -331,12 +331,12 @@ entry_symbol = "godot_java_init"
 compatibility_minimum = 4.6
 
 [libraries]
-macos.debug = "res://native/libgodot-java.dylib"
-macos.release = "res://native/libgodot-java.dylib"
-linux.debug = "res://native/libgodot-java.so"
-linux.release = "res://native/libgodot-java.so"
-windows.debug = "res://native/godot-java.dll"
-windows.release = "res://native/godot-java.dll"
+macos.debug = "res://godot-java/libgodot-java.dylib"
+macos.release = "res://godot-java/libgodot-java.dylib"
+linux.debug = "res://godot-java/libgodot-java.so"
+linux.release = "res://godot-java/libgodot-java.so"
+windows.debug = "res://godot-java/godot-java.dll"
+windows.release = "res://godot-java/godot-java.dll"
 ```
 
 ## 性能特征

@@ -228,7 +228,7 @@ jobs:
           esac
           mkdir -p "$TEMPLATE_DIR"
           curl -L -o godot-bin/export_templates.tpz "${{ steps.godot-urls.outputs.template_url }}"
-          unzip -q godot-bin/export_templates.tpz -d godot-bin/export_templates
+          unzip -q -o godot-bin/export_templates.tpz -d godot-bin/export_templates
           cp godot-bin/export_templates/templates/* "$TEMPLATE_DIR/"
 
       - name: Export smoke project

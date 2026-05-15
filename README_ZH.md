@@ -8,7 +8,7 @@
 
 [Godot](https://godotengine.org/zh-cn/) 的 Java 绑定，通过 GDExtension + Panama FFI 让 Java 在 Godot 生态中成为一等公民。
 
-> 状态：0.1.3——生产就绪，具备 scoped 内存管理、完整 GDExtension 功能覆盖，以及 Maven Central 桌面运行时发布物。
+> 状态：生产就绪，具备 scoped 内存管理、完整 GDExtension 功能覆盖，以及 Maven Central 桌面运行时发布物。
 
 ## 开始新项目
 
